@@ -1,0 +1,16 @@
+<svg width="900" height="240" viewBox="0 0 900 240" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vrixo">
+  <rect width="900" height="240" fill="transparent"/>
+  <g fill="#070A0D">
+    <path d="M35 54H80L122 164L166 54H211L145 194H101L35 54Z"/>
+    <text
+      x="242"
+      y="166"
+      fill="#070A0D"
+      font-family="Arial Black, Montserrat, Arial, sans-serif"
+      font-size="144"
+      font-weight="900"
+      letter-spacing="24"
+    >RIXO</text>
+  </g>
+  <path d="M86 66L109 53L143 137L121 150L86 66Z" fill="#B99A5B"/>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="DreamCart product placeholder">
+  <rect width="800" height="800" fill="#f1f5f9"/>
+  <path d="M230 500h340l-38-170c-8-36-40-62-77-62H345c-37 0-69 26-77 62l-38 170Z" fill="#0f766e" opacity=".16"/>
+  <path d="M280 500h240M318 392h164M348 336h104" fill="none" stroke="#0f766e" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="400" cy="400" r="300" fill="none" stroke="#cbd5e1" stroke-width="16"/>
+</svg>
