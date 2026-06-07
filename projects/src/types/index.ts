@@ -21,6 +21,8 @@ export type Product = {
   featured: boolean;
   bestseller: boolean;
   newArrival: boolean;
+  highlighted: boolean;
+  displaySections?: import("@/lib/product-display").ProductDisplaySection[];
   status?: "active" | "draft" | "archived";
   rating: number;
   reviewCount: number;
@@ -134,6 +136,107 @@ export type Review = {
   comment: string;
   createdAt: string;
   userName?: string;
+};
+
+export type OrderState =
+  | "pending"
+  | "confirmed"
+  | "processing"
+  | "packed"
+  | "shipped"
+  | "delivered"
+  | "cancelled"
+  | "return_requested"
+  | "return_approved"
+  | "return_pickup_scheduled"
+  | "return_received"
+  | "refund_processed"
+  | "completed";
+
+export const ORDER_LIFECYCLE: Record<OrderState, { label: string; allowedTransitions: OrderState[]; cancellable: boolean; returnable: boolean }> = {
+  pending:             { label: "Pending",             allowedTransitions: ["confirmed", "cancelled"],                               cancellable: true,  returnable: false },
+  confirmed:           { label: "Confirmed",           allowedTransitions: ["processing", "cancelled"],                              cancellable: true,  returnable: false },
+  processing:          { label: "Processing",          allowedTransitions: ["packed", "cancelled"],                                  cancellable: false, returnable: false },
+  packed:              { label: "Packed",              allowedTransitions: ["shipped", "cancelled"],                                 cancellable: false, returnable: false },
+  shipped:             { label: "Shipped",             allowedTransitions: ["delivered"],                                             cancellable: false, returnable: false },
+  delivered:           { label: "Delivered",           allowedTransitions: ["return_requested", "completed"],                         cancellable: false, returnable: true },
+  cancelled:           { label: "Cancelled",           allowedTransitions: [],                                                        cancellable: false, returnable: false },
+  return_requested:    { label: "Return Requested",    allowedTransitions: ["return_approved", "return_received", "cancelled"],       cancellable: false, returnable: false },
+  return_approved:     { label: "Return Approved",     allowedTransitions: ["return_pickup_scheduled", "return_received", "cancelled"], cancellable: false, returnable: false },
+  return_pickup_scheduled: { label: "Pickup Scheduled", allowedTransitions: ["return_received", "cancelled"],                        cancellable: false, returnable: false },
+  return_received:     { label: "Return Received",     allowedTransitions: ["refund_processed"],                                     cancellable: false, returnable: false },
+  refund_processed:    { label: "Refund Processed",    allowedTransitions: ["completed"],                                             cancellable: false, returnable: false },
+  completed:           { label: "Completed",           allowedTransitions: [],                                                        cancellable: false, returnable: false },
+};
+
+export type SupportTicket = {
+  id: string;
+  ticketNumber: string;
+  userId: string | null;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string | null;
+  subject: string;
+  description: string;
+  category: "order" | "payment" | "shipping" | "product" | "return" | "cancellation" | "account" | "general" | "complaint" | "other";
+  priority: "low" | "normal" | "high" | "urgent";
+  status: "open" | "in_progress" | "waiting_on_customer" | "waiting_on_admin" | "resolved" | "closed";
+  assignedTo: string | null;
+  source: "web" | "whatsapp" | "email" | "phone" | "admin";
+  orderId: string | null;
+  orderNumber: string | null;
+  firstResponseAt: string | null;
+  resolvedAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TicketReply = {
+  id: string;
+  ticketId: string;
+  userId: string | null;
+  authorName: string;
+  authorRole: "customer" | "admin" | "system";
+  isAdmin: boolean;
+  message: string;
+  attachments: Array<{ url: string; name: string }>;
+  internalNote: boolean;
+  createdAt: string;
+};
+
+export type ReturnRequest = {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  userId: string | null;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string | null;
+  reason: string;
+  details: string | null;
+  status: "pending" | "approved" | "rejected" | "pickup_scheduled" | "pickup_done" | "item_received" | "refund_processed" | "completed" | "cancelled";
+  items: Array<{ title: string; quantity: number; price: number }>;
+  pickupAddress: Record<string, unknown> | null;
+  pickupDate: string | null;
+  courier: string | null;
+  trackingNumber: string | null;
+  adminNotes: string | null;
+  refundAmount: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OrderStatusLog = {
+  id: string;
+  orderId: string;
+  fromStatus: string;
+  toStatus: string;
+  changedBy: string;
+  changedById: string | null;
+  reason: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
 };
 
 export type AnalyticsSummary = {

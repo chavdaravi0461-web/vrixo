@@ -8,7 +8,7 @@ type RateLimitOptions = {
   windowMs: number;
 };
 
-const buckets = new Map<string, { count: number; resetAt: number }>();
+export const buckets = new Map<string, { count: number; resetAt: number }>();
 
 export const secureCartItemSchema = z.object({
   productId: z.string().uuid("Invalid product ID."),
@@ -70,10 +70,11 @@ export function sanitizePlainText(value: unknown, maxLength = 5000) {
 }
 
 export function securityLog(event: string, details: Record<string, unknown> = {}) {
-  console.info(`[security] ${event}`, {
+  console.info("[security]", JSON.stringify({
+    event,
     ...details,
-    at: new Date().toISOString()
-  });
+    ts: new Date().toISOString()
+  }));
 }
 
 function getClientIp(request: Request) {

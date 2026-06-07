@@ -1,5 +1,4 @@
-import { connectMongo } from "@/lib/mongo/models";
-import mongoose, { Schema } from "mongoose";
+import { withRedis } from "@/lib/redis";
 
 type CustomerMemoryRecord = {
   customerId: string;
@@ -39,60 +38,53 @@ type CustomerMemoryRecord = {
     seasonalPreferences?: Record<string, number>;
     dayOfWeekBias?: Record<string, number>;
   };
+  lastUpdated?: string;
 };
 
-// Customer memory for personalization
-const CustomerMemorySchema = new Schema({
-  customerId: { type: String, index: true, unique: true },
-  email: String,
-  phone: String,
-  shoppingPreferences: {
-    favoriteCategories: [String],
-    brandAffinity: { type: Map, of: Number }, // brand: score
-    sizeHistory: { type: Map, of: Number }, // size: frequency
-    colorPreferences: [String],
-    priceRange: { min: Number, max: Number },
-    preferredDeliverySpeed: String // "express", "standard", "budget"
-  },
-  purchaseHistory: {
-    totalPurchases: { type: Number, default: 0 },
-    totalSpent: { type: Number, default: 0 },
-    averageOrderValue: { type: Number, default: 0 },
-    lastPurchaseDate: Date,
-    categoryFrequency: { type: Map, of: Number }
-  },
-  behaviorMetrics: {
-    browsingFrequency: { type: Number, default: 0 }, // sessions per month
-    conversionRate: { type: Number, default: 0 }, // 0-1
-    cartAbandonmentRate: { type: Number, default: 0 },
-    returnRate: { type: Number, default: 0 },
-    reviewsGiven: { type: Number, default: 0 }
-  },
-  lifetime: {
-    customerSegment: String, // "vip", "loyal", "occasional", "at-risk"
-    ltv: { type: Number, default: 0 }, // lifetime value
-    predictedChurnRisk: { type: Number, default: 0 }, // 0-1
-    engagementScore: { type: Number, default: 0 }, // 0-100
-    npsScore: Number
-  },
-  personalizationVectors: {
-    embeddings: [Number], // 384-dim embeddings for semantic search
-    seasonalPreferences: { type: Map, of: Number }, // seasonal affinity
-    dayOfWeekBias: { type: Map, of: Number } // purchase day preference
-  },
-  lastUpdated: { type: Date, default: Date.now }
-});
-
-const CustomerMemory = mongoose.models.CustomerMemory || mongoose.model("CustomerMemory", CustomerMemorySchema);
+const CUSTOMER_MEMORY_INDEX = "customer-memory:index";
 
 export async function upsertCustomerMemory(customerId: string, updates: Partial<CustomerMemoryRecord>) {
-  await connectMongo();
-  return CustomerMemory.findOneAndUpdate({ customerId }, { ...updates, lastUpdated: new Date() }, { upsert: true, new: true });
+  const existing = await getCustomerMemory(customerId);
+  const next: CustomerMemoryRecord = {
+    ...(existing ?? { customerId }),
+    ...updates,
+    customerId,
+    shoppingPreferences: {
+      ...(existing?.shoppingPreferences ?? {}),
+      ...(updates.shoppingPreferences ?? {})
+    },
+    purchaseHistory: {
+      ...(existing?.purchaseHistory ?? {}),
+      ...(updates.purchaseHistory ?? {})
+    },
+    behaviorMetrics: {
+      ...(existing?.behaviorMetrics ?? {}),
+      ...(updates.behaviorMetrics ?? {})
+    },
+    lifetime: {
+      ...(existing?.lifetime ?? {}),
+      ...(updates.lifetime ?? {})
+    },
+    personalizationVectors: {
+      ...(existing?.personalizationVectors ?? {}),
+      ...(updates.personalizationVectors ?? {})
+    },
+    lastUpdated: new Date().toISOString()
+  };
+
+  await withRedis(async (redis) => {
+    await redis.hset(CUSTOMER_MEMORY_INDEX, customerId, JSON.stringify(next));
+    return true;
+  }, false);
+
+  return next;
 }
 
 export async function getCustomerMemory(customerId: string): Promise<CustomerMemoryRecord | null> {
-  await connectMongo();
-  return CustomerMemory.findOne({ customerId }).lean().exec() as Promise<CustomerMemoryRecord | null>;
+  return withRedis(async (redis) => {
+    const value = await redis.hget(CUSTOMER_MEMORY_INDEX, customerId);
+    return value ? (JSON.parse(value) as CustomerMemoryRecord) : null;
+  }, null);
 }
 
 export async function recordPurchase(customerId: string, orderData: {
@@ -100,18 +92,16 @@ export async function recordPurchase(customerId: string, orderData: {
   categories: string[];
   items: Array<{ title: string; category: string; size?: string; color?: string }>;
 }) {
-  await connectMongo();
   const memory = await getCustomerMemory(customerId);
 
   if (!memory) {
-    // First purchase
     return upsertCustomerMemory(customerId, {
       purchaseHistory: {
         totalPurchases: 1,
         totalSpent: orderData.amount,
         averageOrderValue: orderData.amount,
-        lastPurchaseDate: new Date(),
-        categoryFrequency: Object.fromEntries(orderData.categories.map((c) => [c, 1]))
+        lastPurchaseDate: new Date().toISOString(),
+        categoryFrequency: Object.fromEntries(orderData.categories.map((category) => [category, 1]))
       },
       lifetime: {
         customerSegment: "new",
@@ -121,26 +111,21 @@ export async function recordPurchase(customerId: string, orderData: {
     });
   }
 
-  // Update existing memory
   const newTotalPurchases = Number(memory.purchaseHistory?.totalPurchases ?? 0) + 1;
   const newTotalSpent = Number(memory.purchaseHistory?.totalSpent ?? 0) + orderData.amount;
-  const newAOV = newTotalSpent / newTotalPurchases;
-
-  // Track size/color preferences
   const sizeMap = new Map<string, number>(Object.entries(memory.shoppingPreferences?.sizeHistory ?? {}));
   const colorSet = new Set(memory.shoppingPreferences?.colorPreferences || []);
+  const categoryMap = new Map<string, number>(Object.entries(memory.purchaseHistory?.categoryFrequency ?? {}));
+
   for (const item of orderData.items) {
     if (item.size) sizeMap.set(item.size, (sizeMap.get(item.size) || 0) + 1);
     if (item.color) colorSet.add(item.color);
   }
 
-  // Update category frequency
-  const categoryMap = new Map<string, number>(Object.entries(memory.purchaseHistory?.categoryFrequency ?? {}));
-  for (const cat of orderData.categories) {
-    categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1);
+  for (const category of orderData.categories) {
+    categoryMap.set(category, (categoryMap.get(category) || 0) + 1);
   }
 
-  // Calculate LTV and segment
   let segment = "loyal";
   if (newTotalPurchases === 1) segment = "new";
   else if (newTotalPurchases >= 10 || newTotalSpent > 50000) segment = "vip";
@@ -150,12 +135,11 @@ export async function recordPurchase(customerId: string, orderData: {
     purchaseHistory: {
       totalPurchases: newTotalPurchases,
       totalSpent: newTotalSpent,
-      averageOrderValue: newAOV,
-      lastPurchaseDate: new Date(),
+      averageOrderValue: newTotalSpent / newTotalPurchases,
+      lastPurchaseDate: new Date().toISOString(),
       categoryFrequency: Object.fromEntries(categoryMap)
     },
     shoppingPreferences: {
-      ...memory.shoppingPreferences,
       sizeHistory: Object.fromEntries(sizeMap),
       colorPreferences: Array.from(colorSet)
     },
@@ -168,23 +152,17 @@ export async function recordPurchase(customerId: string, orderData: {
 }
 
 export async function recordBrowsingSession(customerId: string, categories: string[], duration: number) {
-  await connectMongo();
-  const memory = await getCustomerMemory(customerId);
   void duration;
-  const currentBrowseFreq = memory?.behaviorMetrics?.browsingFrequency || 0;
-  const categoryMap = new Map<string, number>(memory?.shoppingPreferences?.favoriteCategories?.map((c: string) => [c, 0]) || []);
-  for (const cat of categories) {
-    categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1);
-  }
+  const memory = await getCustomerMemory(customerId);
+  const categorySet = new Set(memory?.shoppingPreferences?.favoriteCategories || []);
+  categories.forEach((category) => categorySet.add(category));
 
   return upsertCustomerMemory(customerId, {
     behaviorMetrics: {
-      ...memory?.behaviorMetrics,
-      browsingFrequency: currentBrowseFreq + 1
+      browsingFrequency: Number(memory?.behaviorMetrics?.browsingFrequency ?? 0) + 1
     },
     shoppingPreferences: {
-      ...memory?.shoppingPreferences,
-      favoriteCategories: Array.from(categoryMap.keys()).slice(0, 5)
+      favoriteCategories: Array.from(categorySet).slice(0, 5)
     }
   });
 }
@@ -198,44 +176,37 @@ export async function calculateChurnRisk(customerId: string): Promise<number> {
     ? Math.floor((Date.now() - new Date(memory.purchaseHistory.lastPurchaseDate).getTime()) / (1000 * 60 * 60 * 24))
     : 999;
 
-  // Inactivity is primary churn signal
   if (daysSinceLastPurchase > 90) riskScore += 40;
   else if (daysSinceLastPurchase > 60) riskScore += 25;
   else if (daysSinceLastPurchase > 30) riskScore += 10;
 
-  // Return/refund pattern
   if ((memory.behaviorMetrics?.returnRate ?? 0) > 0.3) riskScore += 20;
-
-  // Low engagement
   if ((memory.lifetime?.engagementScore ?? 0) < 30) riskScore += 15;
-
-  // Cart abandonment trend
   if ((memory.behaviorMetrics?.cartAbandonmentRate ?? 0) > 0.5) riskScore += 15;
 
   return Math.min(100, riskScore);
 }
 
 export async function getTopSegmentCustomers(segment: string, limit = 100) {
-  await connectMongo();
-  return CustomerMemory.find({ "lifetime.customerSegment": segment })
-    .sort({ "lifetime.ltv": -1 })
-    .limit(limit)
-    .lean();
+  const rows = await getAllCustomerMemory();
+  return rows
+    .filter((memory) => memory.lifetime?.customerSegment === segment)
+    .sort((a, b) => Number(b.lifetime?.ltv ?? 0) - Number(a.lifetime?.ltv ?? 0))
+    .slice(0, limit);
 }
 
 export async function getAtRiskCustomers(limit = 50) {
-  await connectMongo();
-  return CustomerMemory.find({ "lifetime.predictedChurnRisk": { $gt: 0.6 } })
-    .sort({ "lifetime.predictedChurnRisk": -1 })
-    .limit(limit)
-    .lean();
+  const rows = await getAllCustomerMemory();
+  return rows
+    .filter((memory) => Number(memory.lifetime?.predictedChurnRisk ?? 0) > 0.6)
+    .sort((a, b) => Number(b.lifetime?.predictedChurnRisk ?? 0) - Number(a.lifetime?.predictedChurnRisk ?? 0))
+    .slice(0, limit);
 }
 
 export async function generatePersonalizationVectors(customerId: string) {
   const memory = await getCustomerMemory(customerId);
   if (!memory) return null;
 
-  // Generate simple embeddings from preferences (in production, use OpenAI embeddings)
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
   if (!GROQ_API_KEY) return null;
 
@@ -258,9 +229,24 @@ export async function generatePersonalizationVectors(customerId: string) {
 
   return upsertCustomerMemory(customerId, {
     personalizationVectors: {
-      embeddings: embeddings.slice(0, 384), // truncate to 384 dims
+      embeddings: embeddings.slice(0, 384),
       seasonalPreferences: {},
       dayOfWeekBias: {}
     }
   });
+}
+
+async function getAllCustomerMemory() {
+  return withRedis(async (redis) => {
+    const rows = await redis.hgetall(CUSTOMER_MEMORY_INDEX);
+    return Object.values(rows)
+      .map((row) => {
+        try {
+          return JSON.parse(row) as CustomerMemoryRecord;
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean) as CustomerMemoryRecord[];
+  }, [] as CustomerMemoryRecord[]);
 }

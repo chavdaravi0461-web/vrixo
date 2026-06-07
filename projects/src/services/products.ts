@@ -4,7 +4,13 @@ import { isSupabaseConfigured } from "@/lib/utils";
 import { createPublicSupabaseClient } from "@/lib/supabase/public";
 import { normalizeProductImages } from "@/lib/product-images";
 import { uniqueProducts } from "@/lib/product-audience";
+import { valkeyCache } from "@/lib/valkey";
+import { getProductDisplaySections, productShowsIn } from "@/lib/product-display";
 import type { Product } from "@/types/index";
+
+const PRODUCT_CACHE_KEY = "cache:product:all_active";
+const PRODUCT_CACHE_TTL = 300; // 5 minutes
+const PRODUCT_CACHE_TAGS = ["products"];
 
 // Narrow SELECT for single product detail (includes full description, specs for detail page)
 const PRODUCT_DETAIL_SELECT =
@@ -41,6 +47,8 @@ export function mapProductRow(row: Record<string, unknown>): Product {
     featured: Boolean(row.featured),
     bestseller: Boolean(row.bestseller),
     newArrival: Boolean(row.new_arrival),
+    highlighted: Boolean(row.highlighted),
+    displaySections: getProductDisplaySections(row),
     status,
     rating: Number(row.rating ?? 0),
     reviewCount: Number(row.review_count ?? 0),
@@ -82,6 +90,9 @@ export const getProductBySlugDirect = cache(async (slug: string) => {
 
 // Fallback to full load if direct query fails
 const getAllActiveProducts = cache(async () => {
+  const cached = await valkeyCache.get<Product[]>(PRODUCT_CACHE_KEY);
+  if (cached !== null) return cached;
+
   if (!isSupabaseConfigured()) {
     return [];
   }
@@ -101,6 +112,11 @@ const getAllActiveProducts = cache(async () => {
     const products = uniqueProducts(data
       .map((row) => mapProductRow(row as Record<string, unknown>))
       .filter((product) => (product.status ?? "active") === "active"));
+
+    await valkeyCache.set(PRODUCT_CACHE_KEY, products, {
+      ttlSeconds: PRODUCT_CACHE_TTL,
+      tags: PRODUCT_CACHE_TAGS,
+    });
 
     return products;
   } catch {
@@ -122,22 +138,36 @@ export async function getProductBySlug(slug: string) {
 
 export async function getFeaturedProducts() {
   const products = await getProducts();
-  return products.filter((product) => product.featured).slice(0, 4);
+  return products.filter((product) => productShowsIn(product, "featured")).slice(0, 8);
+}
+
+export async function getHighlightedProduct() {
+  const products = await getProducts();
+  return products.find((product) => productShowsIn(product, "hero")) ?? null;
 }
 
 export async function getBestSellerProducts() {
   const products = await getProducts();
-  return products.filter((product) => product.bestseller).slice(0, 4);
+  return products.filter((product) => productShowsIn(product, "best_seller")).slice(0, 8);
 }
 
 export async function getNewArrivalProducts() {
   const products = await getProducts();
-  return products.filter((product) => product.newArrival).slice(0, 4);
+  return products.filter((product) => productShowsIn(product, "new_arrival")).slice(0, 8);
 }
 
 export async function getRelatedProducts(product: Product) {
-  const products = await getProducts({ category: product.category });
+  const products = await getProducts({ category: product.category, displaySection: "related" });
   return products.filter((item) => item.id !== product.id).slice(0, 4);
+}
+
+export async function getHeroProducts() {
+  const products = await getProducts();
+  return products.filter((product) => productShowsIn(product, "hero")).slice(0, 8);
+}
+
+export async function invalidateProductCache(): Promise<void> {
+  await valkeyCache.invalidateTag("products");
 }
 
 function normalizeStatus(value: unknown): Product["status"] {

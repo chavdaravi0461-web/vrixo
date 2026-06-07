@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { getWhatsAppServerEnv, formatWhatsAppPhone, sendWhatsAppProductCarousel } from "@/lib/whatsapp";
+import { requireAnyHeaderSecret } from "@/lib/server/secret-guard";
+import { safeRoute } from "@/lib/safe-route";
 
-export async function POST(request: Request) {
-  const key = request.headers.get("x-admin-key");
-  if (!key || key !== process.env.ADMIN_API_KEY) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+export const POST = safeRoute(async function POST(request: Request) {
+  const authError = requireAnyHeaderSecret(request, ["x-admin-key"], [process.env.ADMIN_API_KEY]);
+  if (authError) return authError;
 
   const body = await request.json().catch(() => ({}));
   const to = String(body.to ?? "");
@@ -22,4 +24,4 @@ export async function POST(request: Request) {
   } catch (err) {
     return NextResponse.json({ message: "failed", error: String(err) }, { status: 500 });
   }
-}
+});

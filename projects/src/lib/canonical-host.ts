@@ -7,9 +7,10 @@ return getAppUrl();
 export function getCanonicalHost() {
 try {
 return new URL(getCanonicalAppUrl())
-.host
-.replace(/^www./, "")
-.toLowerCase();
+      .host
+      .replace(/^www\./i, "")
+      .toLowerCase()
+      .trim();
 } catch {
 return "vrixo.in";
 }

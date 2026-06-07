@@ -15,7 +15,7 @@ type Bucket = {
   blockedUntil?: number;
 };
 
-const memoryBuckets = new Map<string, Bucket>();
+export const memoryBuckets = new Map<string, Bucket>();
 
 export function getClientIp(request: Request) {
   return (
@@ -32,6 +32,20 @@ export function getUserAgent(request: Request) {
 
 export async function checkServerRateLimit(request: Request, options: RateLimitOptions) {
   const subject = `${options.key}:${getClientIp(request)}:${options.identifier ?? "anonymous"}`;
+
+  // Prefer Valkey-based rate limiting for distributed consistency
+  try {
+    const { checkValkeyRateLimit } = await import("@/lib/valkey");
+    const valkeyResult = await checkValkeyRateLimit(request, {
+      key: options.key,
+      limit: options.limit,
+      windowMs: options.windowMs,
+    });
+
+    return valkeyResult;
+  } catch {
+    // Valkey unavailable, fall through to database or memory
+  }
 
   if (hasServerSupabaseAdminEnv()) {
     try {

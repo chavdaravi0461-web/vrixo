@@ -77,7 +77,7 @@ export function adminCookieOptions() {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
+    sameSite: "strict" as const,
     path: "/",
     maxAge: ADMIN_SESSION_TTL_SECONDS
   };
@@ -87,7 +87,7 @@ export function expiredAdminCookieOptions() {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
+    sameSite: "strict" as const,
     path: "/",
     maxAge: 0
   };

@@ -1,6 +1,26 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 
+const isDev = process.env.NODE_ENV === "development";
+
+const scriptSrc = [
+  "'self'",
+  "'unsafe-inline'",
+  isDev ? "'unsafe-eval'" : "'wasm-unsafe-eval'",
+  "https://checkout.razorpay.com",
+  isDev && "https://vercel.live",
+].filter(Boolean).join(" ");
+
+const connectSrc = [
+  "'self'",
+  "https:",
+  "wss:",
+  "*.supabase.co",
+  "api.razorpay.com",
+  "checkout.razorpay.com",
+  isDev && "https://vercel.live",
+].filter(Boolean).join(" ");
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -9,11 +29,13 @@ const contentSecurityPolicy = [
   "form-action 'self'",
   "img-src 'self' data: blob: https: *.supabase.co images.unsplash.com images.pexels.com",
   "font-src 'self' data:",
-  "style-src 'self' 'unsafe-inline'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
+  `style-src 'self' 'unsafe-inline'`,
+  `script-src ${scriptSrc}`,
   "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
-  "connect-src 'self' https: wss: *.supabase.co api.razorpay.com checkout.razorpay.com"
-].join("; ");
+  `connect-src ${connectSrc}`,
+  "block-all-mixed-content",
+  !isDev && "upgrade-insecure-requests",
+].filter(Boolean).join("; ");
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
@@ -34,6 +56,7 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
+    qualities: [70, 75, 78, 82],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
     // Extended device sizes for responsive images
     deviceSizes: [360, 414, 640, 768, 1024, 1280, 1536],
@@ -50,10 +73,15 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "*.supabase.co"
+        hostname: "**.supabase.co"
+      },
+      {
+        protocol: "https",
+        hostname: "rcttssjtujvntyvtclyh.supabase.co"
       }
     ],
     // Cache strategy - long cache for immutable assets
+    dangerouslyAllowLocalIP: isDev,
     dangerouslyAllowSVG: false,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     // Disable static imports for more granular control
@@ -69,6 +97,8 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
+          { key: "X-DNS-Prefetch-Control", value: "off" },
           { key: "Content-Security-Policy", value: contentSecurityPolicy },
           {
             key: "Permissions-Policy",
@@ -77,10 +107,11 @@ const nextConfig: NextConfig = {
         ]
       },
       {
-        source: "/admin/:path*",
+        source: "/dashboard-admin-vrixo-ravi/:path*",
         headers: [
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
-          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" }
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
+          { key: "X-Frame-Options", value: "DENY" }
         ]
       }
     ];

@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { checkServerRateLimit } from "@/lib/rate-limit";
 import { tooManyRequests } from "@/lib/api-response";
 import { contactSchema } from "@/lib/validations";
+import { safeRoute } from "@/lib/safe-route";
 
 const contactUsSchema = z.object({
   name: z.string().trim().min(2, "Name is required."),
@@ -12,7 +13,7 @@ const contactUsSchema = z.object({
   message: z.string().trim().min(10, "Message is required.")
 });
 
-export async function POST(request: Request) {
+export const POST = safeRoute(async function POST(request: Request) {
   const rateLimit = await checkServerRateLimit(request, { key: "contact", limit: 5, windowMs: 10 * 60 * 1000 });
   if (!rateLimit.allowed) return tooManyRequests(rateLimit.retryAfter);
 
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ message: "Message sent successfully." });
-}
+});
 
 function parseContactPayload(body: unknown):
   | {

@@ -9,7 +9,7 @@ export const OTP_MAX_ATTEMPTS = 3;
 export const DEVELOPMENT_TEST_OTP = "123456";
 
 export function isDevelopmentOtpMode() {
-  return process.env.NODE_ENV !== "production";
+  return process.env.NODE_ENV === "development";
 }
 
 export function hasOtpAuthSecret() {

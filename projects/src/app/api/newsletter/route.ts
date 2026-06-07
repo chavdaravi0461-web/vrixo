@@ -3,8 +3,9 @@ import { hasServerSupabaseAdminEnv } from "@/lib/env/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkServerRateLimit } from "@/lib/rate-limit";
 import { serverError, tooManyRequests } from "@/lib/api-response";
+import { safeRoute } from "@/lib/safe-route";
 
-export async function POST(request: Request) {
+export const POST = safeRoute(async function POST(request: Request) {
   const rateLimit = await checkServerRateLimit(request, { key: "newsletter", limit: 8, windowMs: 10 * 60 * 1000 });
   if (!rateLimit.allowed) return tooManyRequests(rateLimit.retryAfter);
 
@@ -29,4 +30,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ message: "Subscribed successfully." });
-}
+});

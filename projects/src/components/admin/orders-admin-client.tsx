@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const statuses = [
+  { value: "confirmed", label: "Confirmed" },
   { value: "processing", label: "Processing" },
   { value: "shipped", label: "Shipped" },
   { value: "delivered", label: "Delivered" },
@@ -101,7 +102,7 @@ export function OrdersAdminClient({
     });
 
     const queryString = params.toString();
-    router.replace(`/dashboard-admin-dreamcart-ravi/orders${queryString ? `?${queryString}` : ""}`, { scroll: false });
+    router.replace(`/dashboard-admin-vrixo-ravi/orders${queryString ? `?${queryString}` : ""}`, { scroll: false });
   }, [
     dateFrom,
     dateTo,
@@ -151,21 +152,22 @@ export function OrdersAdminClient({
 
   return (
     <div className="space-y-4">
-      <div className="admin-card p-4">
+      <div className="os-card p-4">
         <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
         <label className="relative block">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--os-text-3)]" />
         <Input
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
           placeholder="Search by order ID, name, phone, email, or Razorpay payment ID"
-          className="h-12 rounded-2xl bg-slate-50 pl-10"
+          className="h-10 rounded-lg border-[var(--os-border)] bg-[var(--os-surface-3)] pl-9 text-sm text-[var(--os-text)]"
         />
         </label>
         <div className="flex flex-wrap gap-2">
           <select className="h-12 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold" value={orderStatus} onChange={(event) => { setOrderStatus(event.target.value); updateOrdersUrl({ order_status: event.target.value, page: "1" }); }}>
             <option value="all">All orders</option>
             <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
             <option value="processing">Processing</option>
             <option value="shipped">Shipped</option>
             <option value="delivered">Delivered</option>
@@ -216,15 +218,15 @@ export function OrdersAdminClient({
       ))}
 
       {pageCount > 1 ? (
-        <div className="admin-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm font-semibold text-slate-600">
+        <div className="os-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-[var(--os-text-3)]">
             Showing {visibleOrders.length} of {pagination.total} matching orders.
           </p>
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" disabled={currentPage <= 1} onClick={() => updateOrdersUrl({ page: String(currentPage - 1) })}>
               Previous
             </Button>
-            <span className="text-sm font-bold text-slate-700">
+            <span className="text-sm font-bold text-[var(--os-text-2)]">
               Page {currentPage} of {pageCount}
             </span>
             <Button type="button" variant="outline" disabled={currentPage >= pageCount} onClick={() => updateOrdersUrl({ page: String(currentPage + 1) })}>
@@ -235,7 +237,7 @@ export function OrdersAdminClient({
       ) : null}
 
       {pagination.total === 0 ? (
-        <div className="admin-card p-8 text-center text-slate-600">
+        <div className="os-card p-8 text-center text-[var(--os-text-3)]">
           No matching orders found.
         </div>
       ) : null}
@@ -251,19 +253,19 @@ const OrderCard = memo(function OrderCard({
   onStatusChange: (order: AdminOrder, orderStatus: string) => Promise<void>;
 }) {
   return (
-    <div className="admin-card admin-lazy-row p-5 md:p-6">
-          <div className="grid gap-6 xl:grid-cols-[1fr_430px]">
+    <div className="os-card os-row p-4 md:p-5">
+          <div className="grid gap-5 xl:grid-cols-[1fr_430px]">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--os-text-3)]">
                 {order.order_number}
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <h2 className="text-xl font-black text-slate-950">{order.customer_name}</h2>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-bold text-[var(--os-text)]">{order.customer_name}</h2>
                 <StatusPill value={order.order_status} />
                 <PaymentPill value={order.payment_status ?? "pending"} />
               </div>
-              <p className="mt-2 inline-flex rounded-2xl bg-slate-950 px-4 py-2 text-sm font-black text-white">
-                Total Rs. {order.total}
+              <p className="mt-2 inline-flex rounded-lg bg-[var(--os-accent-soft)] px-3 py-1.5 text-xs font-bold text-[var(--os-accent)]">
+                Total ₹{order.total}
               </p>
 
               <div className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-2">
@@ -318,7 +320,7 @@ const OrderCard = memo(function OrderCard({
 
               <div className="space-y-3">
                 {(order.items ?? []).map((item, index) => (
-                  <div key={`${order.id}-${item.productId ?? index}`} className="flex gap-3 rounded-2xl border border-slate-200 p-3">
+                  <div key={`${order.id}-${item.productId ?? "item"}-${index}`} className="flex gap-3 rounded-2xl border border-slate-200 p-3">
                     <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-slate-100">
                       {item.image ? (
                         <Image

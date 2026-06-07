@@ -21,7 +21,7 @@ insert into public.products (
   'Razorpay Test Product',
   'shoes',
   'Payment Test',
-  'DreamCart',
+  'Vrixo',
   'Low-value product for checking Razorpay checkout.',
   'A Rs.5 test product added for safely checking Razorpay order creation and payment verification.',
   5, 5, 0, 'INR', 999, 'DC-TEST-005',

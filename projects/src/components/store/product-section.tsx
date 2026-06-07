@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
 import { ProductGrid } from "@/components/store/product-grid";
-import { Button } from "@/components/ui/button";
 import type { Product } from "@/types/index";
 
 export function ProductSection({
@@ -15,18 +18,20 @@ export function ProductSection({
   products: Product[];
 }) {
   return (
-    <section className="container mt-6 border border-[#e3d7c7] bg-white p-4 shadow-sm md:p-6">
-      <div className="mb-5 flex flex-col gap-3 border-b border-[#efe6da] pb-5 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-[#8a5a24]">{eyebrow}</p>
-          <h2 className="mt-1 text-2xl font-black uppercase tracking-[0.04em] text-[#181510]">{title}</h2>
-          <p className="mt-1 max-w-3xl text-sm text-[#6b6256]">{description}</p>
+    <section className="dc-section">
+      <div className="dc-container">
+        <div className="mb-5 text-center">
+          {eyebrow && <span className="inline-block rounded bg-[var(--dc-blue)] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white mb-2">{eyebrow}</span>}
+          <h2 className="text-xl font-bold text-[var(--dc-heading)]" style={{ fontFamily: "var(--dc-font-heading)" }}>{title}</h2>
+          {description && <p className="text-sm text-[var(--dc-muted)] mt-1">{description}</p>}
         </div>
-        <Link href="/shop">
-          <Button className="rounded-none bg-[#181510] font-black uppercase tracking-[0.12em] hover:bg-[#8a5a24]">View all</Button>
-        </Link>
+        <ProductGrid products={products} />
+        <div className="mt-4 text-center">
+          <Link href="/shop" className="dc-btn dc-btn-primary">
+            View all <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </div>
-      <ProductGrid products={products} />
     </section>
   );
 }

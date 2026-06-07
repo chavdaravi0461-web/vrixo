@@ -21,14 +21,14 @@ export function CouponsAdminClient({
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-      <div className="admin-table-card p-6">
-        <h1 className="text-3xl font-black text-slate-950">Coupons</h1>
-        <div className="mt-6 space-y-4">
+      <div className="os-card p-6">
+        <h1 className="text-2xl font-bold text-[var(--os-text)] tracking-tight">Coupons</h1>
+        <div className="mt-5 space-y-3">
           {coupons.map((coupon) => (
-            <div key={coupon.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <h2 className="text-lg font-black text-slate-950">{coupon.code}</h2>
-              <p className="mt-1 text-sm text-slate-500">{coupon.description}</p>
-              <p className="mt-2 text-sm text-slate-700">
+            <div key={coupon.id} className="rounded-[var(--os-radius-sm)] border border-[var(--os-border)] bg-[rgba(255,255,255,0.012)] p-3">
+              <h2 className="text-sm font-bold text-[var(--os-text)]">{coupon.code}</h2>
+              <p className="mt-0.5 text-[10px] text-[var(--os-text-3)]">{coupon.description}</p>
+              <p className="mt-1 text-[10px] text-[var(--os-text-2)]">
                 {coupon.discount_type} / {coupon.discount_value}
               </p>
             </div>
@@ -36,7 +36,7 @@ export function CouponsAdminClient({
         </div>
       </div>
       <form
-        className="admin-card p-6"
+        className="os-card p-5"
         onSubmit={async (event) => {
           event.preventDefault();
           const response = await fetch("/api/admin/coupons", {

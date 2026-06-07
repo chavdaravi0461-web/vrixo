@@ -8,12 +8,12 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-[var(--dc-black)] text-white hover:bg-[var(--dc-brown)] focus:outline-none focus:ring-4 focus:ring-[var(--ring)]",
+          "bg-[var(--dc-bg-deep)] text-white hover:bg-[var(--dc-surface-hover)] focus:outline-none focus:ring-4 focus:ring-[var(--dc-gold)]",
         secondary:
-          "bg-[var(--dc-gold)] text-white hover:bg-[var(--dc-gold-dark)] focus:outline-none focus:ring-4 focus:ring-[var(--ring)]",
+          "bg-white text-black hover:bg-[var(--dc-gold-dark)] focus:outline-none focus:ring-4 focus:ring-white/30",
         outline:
-          "border border-[var(--dc-border-dark)] bg-white text-[var(--dc-text)] hover:border-[var(--dc-gold)] hover:bg-[var(--dc-cream)]",
-        ghost: "text-[var(--dc-text)] hover:bg-[var(--dc-cream)]"
+          "border border-[var(--dc-border-strong)] bg-[var(--dc-surface)] text-[var(--dc-text)] hover:border-[var(--dc-gold)] hover:bg-[var(--dc-surface-hover)]",
+        ghost: "text-[var(--dc-text)] hover:bg-[var(--dc-surface)]"
       },
       size: {
         sm: "px-4 py-2 text-xs",

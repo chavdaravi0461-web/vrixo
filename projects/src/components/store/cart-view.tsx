@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Minus, Plus, Trash2 } from "lucide-react";
+import { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { CouponBox } from "@/components/store/coupon-box";
 import { useCartStore } from "@/lib/store/cart-store";
@@ -10,6 +11,14 @@ import { cleanProductTitle, formatCurrency } from "@/lib/utils";
 import { calculateShippingCharge } from "@/lib/order-pricing";
 import { getFallbackProductImage, normalizeProductImage } from "@/lib/product-images";
 import type { ShippingSettings } from "@/lib/order-pricing";
+
+function useDebounce(ms = 300) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  return useCallback((fn: () => void) => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(fn, ms);
+  }, [ms]);
+}
 
 export function CartView({ shippingSettings }: { shippingSettings: ShippingSettings }) {
   const items = useCartStore((state) => state.items);
@@ -20,21 +29,22 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
   const subtotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
   const shipping = calculateShippingCharge(subtotal, items, shippingSettings);
   const total = subtotal + shipping - discount;
+  const debounce = useDebounce(250);
 
   if (!hasHydrated) {
     return <CartViewSkeleton />;
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
+    <div className="dc-cart-layout grid gap-4 lg:grid-cols-[1fr_380px]">
       <div className="space-y-4">
         {items.map((item) => (
           <div
             key={`${item.productId}-${item.selectedSize ?? "nosize"}-${item.selectedColor ?? "nocolor"}`}
-            className="dc-soft-panel p-4"
+            className="dc-cart-item dc-glass rounded-[var(--dc-radius-lg)] p-4"
           >
             <div className="flex flex-col gap-4 md:flex-row">
-              <div className="relative h-36 w-full overflow-hidden rounded-[var(--dc-radius-md)] bg-[var(--dc-cream)] md:w-36">
+              <div className="relative h-36 w-full overflow-hidden rounded-[var(--dc-radius-md)] bg-[var(--dc-surface)] md:w-36">
                 <Image
                   src={normalizeProductImage(item.image) ?? getFallbackProductImage()}
                   alt={cleanProductTitle(item.title)}
@@ -46,14 +56,14 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
               <div className="flex-1">
                 <div className="flex flex-col justify-between gap-4 md:flex-row">
                   <div>
-                    <Link href={`/product/${item.slug}`} className="text-lg font-black text-[var(--dc-black)] hover:text-[var(--dc-gold)]">
+                    <Link href={`/product/${item.slug}`} className="text-lg font-black text-[var(--dc-heading)] hover:text-white">
                       {cleanProductTitle(item.title)}
                     </Link>
                     <div className="mt-2 flex flex-wrap gap-3 text-sm text-[var(--dc-muted)]">
                       {item.selectedSize ? <span>Size {item.selectedSize}</span> : null}
                       {item.selectedColor ? <span>{item.selectedColor}</span> : null}
                     </div>
-                    <p className="mt-3 text-lg font-black text-[var(--dc-black)]">
+                    <p className="mt-3 text-lg font-black text-[var(--dc-heading)]">
                       {formatCurrency(item.price)}
                     </p>
                   </div>
@@ -68,16 +78,18 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
                     Remove
                   </button>
                 </div>
-                <div className="mt-6 inline-flex items-center rounded-full border border-[var(--dc-border)] bg-[var(--dc-cream)] p-1">
+                <div className="mt-6 inline-flex items-center rounded-full border border-[var(--dc-border)] bg-[var(--dc-surface)] p-1">
                   <button
                     type="button"
                     className="rounded-full p-2 transition hover:bg-white"
                     onClick={() =>
-                      updateQuantity(
-                        item.productId,
-                        item.quantity - 1,
-                        item.selectedSize,
-                        item.selectedColor
+                      debounce(() =>
+                        updateQuantity(
+                          item.productId,
+                          item.quantity - 1,
+                          item.selectedSize,
+                          item.selectedColor
+                        )
                       )
                     }
                   >
@@ -88,11 +100,13 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
                     type="button"
                     className="rounded-full p-2 transition hover:bg-white"
                     onClick={() =>
-                      updateQuantity(
-                        item.productId,
-                        item.quantity + 1,
-                        item.selectedSize,
-                        item.selectedColor
+                      debounce(() =>
+                        updateQuantity(
+                          item.productId,
+                          item.quantity + 1,
+                          item.selectedSize,
+                          item.selectedColor
+                        )
                       )
                     }
                   >
@@ -104,8 +118,8 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
           </div>
         ))}
       </div>
-      <div className="dc-soft-panel p-5 lg:sticky lg:top-32 lg:self-start">
-        <h2 className="text-lg font-black uppercase tracking-[0.14em] text-[var(--dc-black)]">Order Summary</h2>
+      <div className="dc-cart-summary dc-glass rounded-[var(--dc-radius-lg)] p-5 lg:sticky lg:top-32 lg:self-start">
+        <h2 className="text-lg font-black uppercase tracking-[0.14em] text-[var(--dc-heading)]">Order Summary</h2>
         <div className="mt-6 space-y-4 text-sm text-[var(--dc-muted)]">
           <div className="flex items-center justify-between">
             <span>Subtotal</span>
@@ -120,7 +134,7 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
             <span>{shipping === 0 ? "Free" : formatCurrency(shipping)}</span>
           </div>
           <div className="border-t border-[var(--dc-border)] pt-4">
-            <div className="flex items-center justify-between text-lg font-black text-[var(--dc-black)]">
+            <div className="flex items-center justify-between text-lg font-black text-[var(--dc-heading)]">
               <span>Total</span>
               <span>{formatCurrency(total)}</span>
             </div>
@@ -132,7 +146,7 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
           </Button>
         </Link>
         {items.length > 0 ? <CouponBox subtotal={subtotal} /> : null}
-        <p className="mt-4 rounded-[var(--dc-radius-md)] border border-[#f3d7a0] bg-[var(--dc-cream)] p-4 text-xs leading-6 text-[var(--dc-muted)]">
+        <p className="mt-4 rounded-[var(--dc-radius-md)] border border-[#f3d7a0] bg-[var(--dc-surface)] p-4 text-xs leading-6 text-[var(--dc-muted)]">
           {shippingSettings.mode === "free"
             ? "Free shipping is active on every order."
             : `Shipping charge is ${formatCurrency(shippingSettings.shippingCharge)}.`} Cash on Delivery
@@ -145,26 +159,26 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
 
 function CartViewSkeleton() {
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_380px]" aria-label="Loading cart">
+    <div className="dc-cart-layout grid gap-4 lg:grid-cols-[1fr_380px]" aria-label="Loading cart">
       <div className="space-y-4">
         {[0, 1].map((item) => (
-          <div key={item} className="dc-soft-panel p-4">
+          <div key={item} className="dc-glass rounded-[var(--dc-radius-lg)] p-4">
             <div className="flex flex-col gap-4 md:flex-row">
-              <div className="h-36 w-full animate-pulse rounded-[var(--dc-radius-md)] bg-[var(--dc-cream)] md:w-36" />
+              <div className="h-36 w-full animate-pulse rounded-[var(--dc-radius-md)] bg-[var(--dc-surface)] md:w-36" />
               <div className="flex-1 space-y-3">
-                <div className="h-5 w-2/3 animate-pulse rounded-full bg-[var(--dc-cream)]" />
-                <div className="h-4 w-1/2 animate-pulse rounded-full bg-[var(--dc-cream)]" />
-                <div className="h-5 w-24 animate-pulse rounded-full bg-[var(--dc-cream)]" />
+                <div className="h-5 w-2/3 animate-pulse rounded-full bg-[var(--dc-surface)]" />
+                <div className="h-4 w-1/2 animate-pulse rounded-full bg-[var(--dc-surface)]" />
+                <div className="h-5 w-24 animate-pulse rounded-full bg-[var(--dc-surface)]" />
               </div>
             </div>
           </div>
         ))}
       </div>
-      <div className="dc-soft-panel space-y-4 p-5">
-        <div className="h-5 w-40 animate-pulse rounded-full bg-[var(--dc-cream)]" />
-        <div className="h-4 w-full animate-pulse rounded-full bg-[var(--dc-cream)]" />
-        <div className="h-4 w-5/6 animate-pulse rounded-full bg-[var(--dc-cream)]" />
-        <div className="h-12 w-full animate-pulse rounded-full bg-[var(--dc-cream)]" />
+      <div className="dc-glass rounded-[var(--dc-radius-lg)] space-y-4 p-5">
+        <div className="h-5 w-40 animate-pulse rounded-full bg-[var(--dc-surface)]" />
+        <div className="h-4 w-full animate-pulse rounded-full bg-[var(--dc-surface)]" />
+        <div className="h-4 w-5/6 animate-pulse rounded-full bg-[var(--dc-surface)]" />
+        <div className="h-12 w-full animate-pulse rounded-full bg-[var(--dc-surface)]" />
       </div>
     </div>
   );

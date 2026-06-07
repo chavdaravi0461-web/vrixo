@@ -3,6 +3,7 @@ import { ProductActions } from "@/components/store/product-actions";
 import { ProductGallery } from "@/components/store/product-gallery";
 import { ProductSection } from "@/components/store/product-section";
 import { ReviewsSection } from "@/components/store/reviews-section";
+import { RecentlyViewedTracker } from "@/components/store/recently-viewed-tracker";
 import { BadgeCheck, BadgePercent, PackageCheck, ShieldCheck, Star, Truck } from "lucide-react";
 import { getAppUrl } from "@/lib/app-url";
 import { buildMetadata } from "@/lib/metadata";
@@ -119,16 +120,17 @@ export default async function ProductPage({
 
   return (
     <>
+      <RecentlyViewedTracker slug={slug} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
       />
-      <section className="dc-container mt-6">
-        <div className="dc-editorial-surface grid gap-5 p-4 lg:grid-cols-[1fr_0.95fr] lg:p-6">
+      <section className="dc-container dc-pdp-shell mt-6">
+        <div className="dc-glass dc-glass-edge dc-pdp-layout grid gap-5 p-4 lg:grid-cols-[1fr_0.95fr] lg:p-6">
           <ProductGallery images={productImages.length > 0 ? productImages : [primaryImage]} title={displayTitle} colors={product.colors} />
-          <div className="p-2">
+          <div className="dc-pdp-info p-2">
             <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--dc-gold)]">{product.brand || product.category}</p>
-            <h1 className="mt-2 text-3xl font-black leading-tight text-[var(--dc-black)] md:text-5xl">{displayTitle}</h1>
+            <h1 className="mt-2 text-3xl font-black leading-tight text-[var(--dc-heading)] md:text-5xl">{displayTitle}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-700 px-3 py-1 text-sm font-bold text-white">
                 {product.rating.toFixed(1)} <Star className="h-3.5 w-3.5 fill-white" />
@@ -137,7 +139,7 @@ export default async function ProductPage({
               <span className="text-sm font-semibold text-green-700">Extra offers available</span>
             </div>
             <div className="mt-5 flex flex-wrap items-end gap-3">
-              <p className="text-4xl font-black text-[var(--dc-black)]">{formatCurrency(product.price)}</p>
+              <p className="text-4xl font-black text-[var(--dc-heading)]">{formatCurrency(product.price)}</p>
               <p className="pb-1 text-lg text-[var(--dc-muted-2)] line-through">
                 {formatCurrency(product.originalPrice)}
               </p>
@@ -146,10 +148,10 @@ export default async function ProductPage({
               ) : null}
             </div>
             <p className="mt-3 text-sm leading-7 text-[var(--dc-muted)]">{displayDescription}</p>
-            <div className="mt-5 grid gap-3 text-sm text-[var(--dc-text)] sm:grid-cols-3">
+            <div className="dc-pdp-info-chips mt-5 grid gap-3 text-sm text-[var(--dc-text)] sm:grid-cols-3">
               <InfoChip icon={Truck} label="Delivery" value="Fast dispatch" />
-              <InfoChip icon={ShieldCheck} label="Stock" value={`${product.stock} available`} />
-              <InfoChip icon={BadgePercent} label="Offers" value="Coupons available" />
+              <InfoChip icon={ShieldCheck} label="Availability" value={product.stock > 0 ? "Ready to ship" : "Sold out"} />
+              <InfoChip icon={BadgePercent} label="Checkout" value="COD and online" />
             </div>
             <ProductConfidencePanel />
             <ProductActions product={product} />
@@ -189,14 +191,14 @@ function ProductDetailsAccordions({
   return (
     <div className="divide-y divide-[var(--dc-border)] border-y border-[var(--dc-border)]">
       <details className="group" open>
-        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-black uppercase tracking-[0.12em] text-[var(--dc-black)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-black uppercase tracking-[0.12em] text-[var(--dc-heading)]">
           Product Details
           <span className="text-xl leading-none text-[var(--dc-gold)] group-open:rotate-45">+</span>
         </summary>
         <p className="pb-5 text-sm leading-7 text-[var(--dc-muted)]">{description}</p>
       </details>
       <details className="group">
-        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-black uppercase tracking-[0.12em] text-[var(--dc-black)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-black uppercase tracking-[0.12em] text-[var(--dc-heading)]">
           Specifications
           <span className="text-xl leading-none text-[var(--dc-gold)] group-open:rotate-45">+</span>
         </summary>
@@ -205,7 +207,7 @@ function ProductDetailsAccordions({
             specificationEntries.map(([key, value]) => (
               <div key={key} className="flex items-center justify-between gap-4 text-sm">
                 <span className="font-medium text-[var(--dc-muted)]">{key}</span>
-                <span className="text-right font-semibold text-[var(--dc-black)]">{value}</span>
+                <span className="text-right font-semibold text-[var(--dc-heading)]">{value}</span>
               </div>
             ))
           ) : (
@@ -214,13 +216,13 @@ function ProductDetailsAccordions({
         </div>
       </details>
       <details className="group">
-        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-black uppercase tracking-[0.12em] text-[var(--dc-black)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-black uppercase tracking-[0.12em] text-[var(--dc-heading)]">
           Delivery & Returns
           <span className="text-xl leading-none text-[var(--dc-gold)] group-open:rotate-45">+</span>
         </summary>
         <div className="grid gap-3 pb-5 text-sm leading-7 text-[var(--dc-muted)]">
           <p>Cash on Delivery and secure online payment are available at checkout.</p>
-          <p>{stock > 0 ? `${stock} pieces currently available for dispatch.` : "This product is currently out of stock."}</p>
+          <p>{stock > 0 ? "Currently available for dispatch." : "This product is currently out of stock."}</p>
           <p>For returns and delivery support, review Vrixo policies from the footer links.</p>
         </div>
       </details>
@@ -263,32 +265,32 @@ function FrequentlyBoughtTogether({
 
   return (
     <section className="dc-container mt-8">
-      <div className="dc-fbt-panel">
+      <div className="dc-glass dc-glass-edge dc-style-bundle rounded-[var(--dc-radius-lg)] p-6">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--dc-gold)]">
             Frequently styled together
           </p>
-          <h2 className="mt-2 text-3xl font-black leading-tight text-[var(--dc-black)]">
+          <h2 className="mt-2 text-3xl font-black leading-tight text-[var(--dc-heading)]">
             Build a complete Vrixo look
           </h2>
           <p className="mt-2 text-sm leading-7 text-[var(--dc-muted)]">
             Pair this product with related picks for a sharper outfit-ready purchase.
           </p>
         </div>
-        <div className="grid gap-3">
+        <div className="dc-style-bundle-list grid gap-3">
           {[product, ...related].map((item) => (
-            <div key={item.id} className="flex items-center justify-between gap-4 rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] bg-white/80 p-4">
+            <div key={item.id} className="flex items-center justify-between gap-4 rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] bg-[var(--dc-surface)] p-4">
               <div>
-                <p className="font-black text-[var(--dc-black)]">{cleanProductTitle(item.title)}</p>
+                <p className="font-black text-[var(--dc-heading)]">{cleanProductTitle(item.title)}</p>
                 <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--dc-muted)]">
                   {item.brand || item.category}
                 </p>
               </div>
-              <p className="shrink-0 font-black text-[var(--dc-black)]">{formatCurrency(item.price)}</p>
+              <p className="shrink-0 font-black text-[var(--dc-heading)]">{formatCurrency(item.price)}</p>
             </div>
           ))}
-          <div className="flex items-center justify-between rounded-[var(--dc-radius-md)] bg-[var(--dc-black)] p-4 text-white">
-            <span className="text-sm font-bold text-[#d9dce3]">Style bundle value</span>
+          <div className="flex items-center justify-between rounded-[var(--dc-radius-md)] bg-[var(--dc-bg-deep)] p-4 text-[var(--dc-heading)]">
+            <span className="text-sm font-bold text-[var(--dc-muted)]">Style bundle value</span>
             <strong className="text-xl">{formatCurrency(total)}</strong>
           </div>
         </div>
@@ -307,11 +309,11 @@ function InfoChip({
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] bg-[var(--dc-cream)] p-3">
+    <div className="flex items-center gap-3 rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] bg-[var(--dc-surface)] p-3">
       <Icon className="h-5 w-5 text-[var(--dc-gold)]" />
       <div>
         <p className="text-xs font-semibold text-[var(--dc-muted)]">{label}</p>
-        <p className="font-bold text-[var(--dc-black)]">{value}</p>
+        <p className="font-bold text-[var(--dc-heading)]">{value}</p>
       </div>
     </div>
   );

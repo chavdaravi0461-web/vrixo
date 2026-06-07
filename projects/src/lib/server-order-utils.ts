@@ -134,6 +134,8 @@ export async function sendOrderSmsAndPersistStatus(
     totalQty: order.sms_total_qty,
     totalAmount: Number(order.total),
     orderStatus: order.order_status,
+    paymentMethod: "cod",
+    paymentStatus: "cod_pending",
     productImageUrl: imageUrl,
     deliveryAddress: deliveryAddress || "Delivery address saved with your order"
   };
@@ -178,7 +180,10 @@ export async function sendOrderSmsAndPersistStatus(
       paymentMethod,
       paymentStatus: paymentMethod === "cod" ? "cod_pending" : "paid",
       productImageUrl: imageUrl,
-      deliveryAddress: payload.deliveryAddress
+      deliveryAddress:
+        typeof payload.deliveryAddress === "string"
+          ? payload.deliveryAddress
+          : "Delivery address saved with your order"
     });
 
     whatsappResult = {

@@ -1,5 +1,5 @@
 /*
-DreamCart Supabase Security Verification
+Vrixo Supabase Security Verification
 
 Run this after supabase/security.sql.
 This file is read-only. It does not modify tables, users, products, orders, or storage objects.

@@ -26,7 +26,7 @@ export function ProductActions({ product }: { product: Product }) {
 
   return (
     <div className="dc-product-actions mt-8 space-y-6">
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="dc-product-option-grid grid gap-4 md:grid-cols-2">
         {product.sizes.length > 0 ? (
           <div>
             <label className="mb-2 block text-sm font-bold text-[var(--dc-text)]">Select size</label>
@@ -39,18 +39,20 @@ export function ProductActions({ product }: { product: Product }) {
             </Select>
           </div>
         ) : null}
-        <div>
-          <label className="mb-2 block text-sm font-bold text-[var(--dc-text)]">Select color</label>
-          <Select className="rounded-full" value={color} onChange={(event) => setColor(event.target.value)}>
-            {product.colors.map((entry) => (
-              <option key={entry} value={entry}>
-                {entry}
-              </option>
-            ))}
-          </Select>
-        </div>
+        {product.colors.length > 0 ? (
+          <div>
+            <label className="mb-2 block text-sm font-bold text-[var(--dc-text)]">Select color</label>
+            <Select className="rounded-full" value={color} onChange={(event) => setColor(event.target.value)}>
+              {product.colors.map((entry) => (
+                <option key={entry} value={entry}>
+                  {entry}
+                </option>
+              ))}
+            </Select>
+          </div>
+        ) : null}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="dc-product-cta-grid grid gap-3 sm:grid-cols-2">
         <Button
           type="button"
           disabled={product.stock <= 0}
@@ -105,7 +107,7 @@ export function ProductActions({ product }: { product: Product }) {
           Buy Now
         </Button>
       </div>
-      <div className="flex flex-wrap gap-3">
+      <div className="dc-product-secondary-actions flex flex-wrap gap-3">
         <Button
           type="button"
           variant="outline"

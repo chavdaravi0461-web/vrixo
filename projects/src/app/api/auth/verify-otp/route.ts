@@ -9,6 +9,7 @@ import { hasOtpAuthSecret, isOtpCodeValid } from "@/lib/otp-auth";
 import { hasServerSupabaseAdminEnv } from "@/lib/env/server";
 import { isSupabaseConfigured } from "@/lib/utils";
 import { serverError } from "@/lib/api-response";
+import { safeRoute } from "@/lib/safe-route";
 
 const verifyOtpSchema = z.object({
   name: z.string().trim().max(120).optional(),
@@ -17,7 +18,7 @@ const verifyOtpSchema = z.object({
   mode: z.enum(["login", "signup"]).default("signup")
 });
 
-export async function POST(request: NextRequest) {
+export const POST = safeRoute(async function POST(request: NextRequest) {
   if (!isSupabaseConfigured() || !hasServerSupabaseAdminEnv()) {
     return serverError("OTP authentication is temporarily unavailable.");
   }
@@ -172,4 +173,4 @@ export async function POST(request: NextRequest) {
   await adminSupabase.from("phone_otp_requests").delete().eq("phone", normalizedPhone);
 
   return response;
-}
+});

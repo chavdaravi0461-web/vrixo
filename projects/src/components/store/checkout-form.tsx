@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ShieldCheck, ExternalLink } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -28,6 +29,7 @@ export function CheckoutForm({
   shippingSettings: ShippingSettings;
 }) {
   const [paymentBusy, setPaymentBusy] = useState(false);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
   const items = useCartStore((state) => state.items);
   const clearCart = useCartStore((state) => state.clearCart);
   const couponCode = useCartStore((state) => state.couponCode);
@@ -53,178 +55,184 @@ export function CheckoutForm({
   });
   const selectedPaymentMethod = useWatch({ control, name: "paymentMethod" });
 
+  async function onCheckoutSubmit(values: CheckoutValues) {
+    if (checkoutBusy || paymentBusy) return;
+
+    const isOnlinePayment = values.paymentMethod === "Online Payment";
+    const idempotencyKey = getCheckoutIdempotencyKey();
+
+    if (!hasHydrated) {
+      toast.error("Cart is still loading. Please try again.");
+      return;
+    }
+
+    if (items.length === 0) {
+      toast.error("Your cart is empty.");
+      return;
+    }
+
+    if (!liveOrderReady) {
+      toast.error("Checkout is temporarily unavailable. Please contact support.");
+      return;
+    }
+
+    if (isOnlinePayment) {
+      await startOnlinePayment(values, idempotencyKey);
+      return;
+    }
+
+    setCheckoutBusy(true);
+    const toastId = toast.loading("Placing your COD order...");
+
+    try {
+      const result = await postJson("/api/orders", {
+        email: values.email,
+        couponCode: values.couponCode || couponCode,
+        paymentMethod: values.paymentMethod,
+        shippingAddress: values,
+        items,
+        idempotencyKey
+      }, 6500);
+      const payload = result.payload;
+
+      if (!result.ok || !payload.success || !payload.orderNumber) {
+        if (payload.field) {
+          setError(payload.field as keyof CheckoutValues, { message: String(payload.message ?? "Invalid value.") });
+        }
+        toast.error(String(payload.message ?? "Checkout failed. Please try again."), { id: toastId });
+        return;
+      }
+
+      clearCart();
+      toast.success("Order placed successfully. WhatsApp confirmation is being sent.", { id: toastId });
+      redirectToOrderSuccess(String(payload.orderNumber), {
+        paymentMethod: String(payload.paymentMethod ?? "cod"),
+        orderStatus: String(payload.orderStatus ?? "pending"),
+        paymentStatus: String(payload.paymentStatus ?? "cod_pending")
+      });
+    } catch {
+      toast.error("Checkout failed. Please try again.", { id: toastId });
+    } finally {
+      setCheckoutBusy(false);
+    }
+  }
+
+  async function startOnlinePayment(values: CheckoutValues, idempotencyKey: string) {
+    if (!razorpayReady) {
+      toast.error("Online payment is temporarily unavailable. Please use Cash on Delivery.");
+      return;
+    }
+
+    setPaymentBusy(true);
+
+    try {
+      const scriptLoaded = await loadRazorpayCheckout();
+
+      if (!scriptLoaded || !window.Razorpay) {
+        toast.error("Payment gateway failed to load. Please try again.");
+        return;
+      }
+
+      const createResult = await postJson("/api/payments/razorpay/create-order", {
+        email: values.email,
+        couponCode: values.couponCode || couponCode,
+        shippingAddress: values,
+        items,
+        idempotencyKey
+      }, 9000);
+      const createPayload = createResult.payload;
+
+      if (!createResult.ok) {
+        toast.error(String(createPayload.message ?? "Payment not completed. Order was not placed."));
+        return;
+      }
+
+      if (!createPayload.keyId || !createPayload.razorpayOrderId || !createPayload.amount) {
+        toast.error("Online payment is temporarily unavailable. Please use Cash on Delivery.");
+        return;
+      }
+
+      const razorpay = new window.Razorpay({
+        key: createPayload.keyId,
+        amount: createPayload.amount,
+        currency: createPayload.currency,
+        name: "Vrixo",
+        description: "Secure online payment for your order",
+        order_id: createPayload.razorpayOrderId,
+        prefill: createPayload.customer,
+        config: {
+          display: {
+            blocks: {
+              upiApps: {
+                name: "Pay with UPI Apps",
+                instruments: [{ method: "upi" }]
+              }
+            },
+            sequence: ["block.upiApps", "card", "netbanking", "wallet"],
+            preferences: { show_default_blocks: true }
+          }
+        },
+        handler: async (paymentResponse: Record<string, unknown>) => {
+          const verifyToastId = toast.loading("Verifying payment...");
+          try {
+            const verifyResult = await postJson("/api/payments/razorpay/verify", {
+              email: values.email,
+              couponCode: values.couponCode || couponCode,
+              shippingAddress: values,
+              items,
+              internalOrderId: String(createPayload.orderId ?? ""),
+              checkoutToken: String(createPayload.checkoutToken ?? ""),
+              razorpayOrderId: String(paymentResponse.razorpay_order_id ?? ""),
+              razorpayPaymentId: String(paymentResponse.razorpay_payment_id ?? ""),
+              razorpaySignature: String(paymentResponse.razorpay_signature ?? "")
+            }, 9000);
+            const verifyPayload = verifyResult.payload;
+
+            if (!verifyResult.ok || !verifyPayload.orderNumber || String(verifyPayload.paymentStatus).toLowerCase() !== "paid") {
+              toast.error(String(verifyPayload.message ?? "Payment verification failed. Order was not placed."), { id: verifyToastId });
+              return;
+            }
+
+            clearCart();
+            toast.success("Online payment completed successfully. WhatsApp confirmation is being sent.", { id: verifyToastId });
+            redirectToOrderSuccess(String(verifyPayload.orderNumber), {
+              paymentMethod: String(verifyPayload.paymentMethod ?? "online"),
+              orderStatus: String(verifyPayload.orderStatus ?? "confirmed"),
+              paymentStatus: String(verifyPayload.paymentStatus ?? "paid"),
+              verifiedPayment: "1"
+            });
+          } finally {
+            setPaymentBusy(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setPaymentBusy(false);
+            toast.error("Payment not completed. Order was not placed.");
+          }
+        },
+        theme: { color: "#0f766e" }
+      });
+
+      razorpay.on("payment.failed", () => {
+        toast.error("Payment not completed. Order was not placed.");
+        setPaymentBusy(false);
+      });
+
+      razorpay.open();
+    } catch {
+      toast.error("Payment could not be started. Please try again.");
+      setPaymentBusy(false);
+    }
+  }
+
   return (
     <form
-      className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_380px]"
-      onSubmit={handleSubmit(async (values) => {
-        const isOnlinePayment = values.paymentMethod === "Online Payment";
-
-        if (!hasHydrated) {
-          toast.error("Cart is still loading. Please try again.");
-          return;
-        }
-
-        if (items.length === 0) {
-          toast.error("Your cart is empty.");
-          return;
-        }
-
-        if (!liveOrderReady) {
-          toast.error("Checkout is temporarily unavailable. Please contact support.");
-          return;
-        }
-
-        if (isOnlinePayment) {
-          if (!razorpayReady) {
-            toast.error("Online payment is temporarily unavailable. Please use Cash on Delivery.");
-            return;
-          }
-
-          setPaymentBusy(true);
-          const scriptLoaded = await loadRazorpayCheckout();
-
-          if (!scriptLoaded || !window.Razorpay) {
-            setPaymentBusy(false);
-            toast.error("Payment gateway failed to load. Please try again.");
-            return;
-          }
-
-          const createResult = await postJson("/api/payments/razorpay/create-order", {
-            email: values.email,
-            couponCode: values.couponCode || couponCode,
-            shippingAddress: values,
-            items
-          });
-          const createPayload = createResult.payload;
-
-          if (!createResult.ok) {
-            setPaymentBusy(false);
-            toast.error(createPayload.message ?? "Payment not completed. Order was not placed.");
-            return;
-          }
-
-          if (!createPayload.keyId || !createPayload.razorpayOrderId || !createPayload.amount) {
-            setPaymentBusy(false);
-            toast.error("Online payment is temporarily unavailable. Please use Cash on Delivery.");
-            return;
-          }
-
-          const razorpay = new window.Razorpay({
-            key: createPayload.keyId,
-            amount: createPayload.amount,
-            currency: createPayload.currency,
-            name: "Vrixo",
-            description: "Secure online payment for your order",
-            order_id: createPayload.razorpayOrderId,
-            prefill: createPayload.customer,
-            config: {
-              display: {
-                blocks: {
-                  upiApps: {
-                    name: "Pay with UPI Apps",
-                    instruments: [
-                      {
-                        method: "upi"
-                      }
-                    ]
-                  }
-                },
-                sequence: ["block.upiApps", "card", "netbanking", "wallet"],
-                preferences: {
-                  show_default_blocks: true
-                }
-              }
-            },
-            handler: async (paymentResponse: Record<string, unknown>) => {
-              try {
-                const verifyResult = await postJson("/api/payments/razorpay/verify", {
-                  email: values.email,
-                  couponCode: values.couponCode || couponCode,
-                  shippingAddress: values,
-                  items,
-                  internalOrderId: String(createPayload.orderId ?? ""),
-                  checkoutToken: String(createPayload.checkoutToken ?? ""),
-                  razorpayOrderId: String(paymentResponse.razorpay_order_id ?? ""),
-                  razorpayPaymentId: String(paymentResponse.razorpay_payment_id ?? ""),
-                  razorpaySignature: String(paymentResponse.razorpay_signature ?? "")
-                });
-                const verifyPayload = verifyResult.payload;
-
-                if (!verifyResult.ok) {
-                  toast.error(
-                    verifyPayload.message ?? "Payment not completed. Order was not placed."
-                  );
-                  return;
-                }
-
-                if (
-                  !verifyPayload.orderNumber ||
-                  String(verifyPayload.paymentStatus).toLowerCase() !== "paid"
-                ) {
-                  toast.error("Payment verification failed. Order was not placed.");
-                  return;
-                }
-
-                clearCart();
-                toast.success("Online payment completed successfully. WhatsApp confirmation is being sent.");
-                redirectToOrderSuccess(String(verifyPayload.orderNumber), {
-                  paymentMethod: String(verifyPayload.paymentMethod ?? "online"),
-                  orderStatus: String(verifyPayload.orderStatus ?? "confirmed"),
-                  paymentStatus: String(verifyPayload.paymentStatus ?? "paid"),
-                  verifiedPayment: "1"
-                });
-              } finally {
-                setPaymentBusy(false);
-              }
-            },
-            modal: {
-              ondismiss: () => {
-                setPaymentBusy(false);
-                toast.error("Payment not completed. Order was not placed.");
-              }
-            },
-            theme: {
-              color: "#0f766e"
-            }
-          });
-
-          razorpay.on("payment.failed", () => {
-            toast.error("Payment not completed. Order was not placed.");
-            setPaymentBusy(false);
-          });
-
-          razorpay.open();
-          return;
-        }
-
-        const result = await postJson("/api/orders", {
-          email: values.email,
-          couponCode: values.couponCode || couponCode,
-          paymentMethod: values.paymentMethod,
-          shippingAddress: values,
-          items
-        });
-        const payload = result.payload;
-
-        if (!result.ok) {
-          if (payload.field) {
-            setError(payload.field as keyof CheckoutValues, { message: payload.message });
-          }
-          toast.error(payload.message ?? "Checkout failed.");
-          return;
-        }
-
-        clearCart();
-        toast.success("Order placed successfully. WhatsApp confirmation is being sent.");
-        redirectToOrderSuccess(String(payload.orderNumber), {
-          paymentMethod: String(payload.paymentMethod ?? "cod"),
-          orderStatus: String(payload.orderStatus ?? "pending"),
-          paymentStatus: String(payload.paymentStatus ?? "cod_pending")
-        });
-      })}
+      className="dc-checkout-layout grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_380px]"
+      onSubmit={handleSubmit(onCheckoutSubmit)}
     >
-      <div className="dc-soft-panel p-5">
-        <h2 className="text-xl font-black uppercase tracking-[0.08em] text-[var(--dc-black)]">Delivery Address</h2>
+      <div className="dc-checkout-address dc-glass rounded-[var(--dc-radius-lg)] p-5">
+        <h2 className="text-xl font-black uppercase tracking-[0.08em] text-[var(--dc-heading)]">Delivery Address</h2>
         {!liveOrderReady ? (
           <div className="mt-6 border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             Checkout is temporarily unavailable. Please contact support for help placing your
@@ -259,13 +267,10 @@ export function CheckoutForm({
           <Field label="Country" error={errors.country?.message}>
             <Input defaultValue="India" {...register("country")} />
           </Field>
-          <Field label="Coupon code" error={errors.couponCode?.message}>
-            <Input defaultValue={couponCode} {...register("couponCode")} />
-          </Field>
         </div>
       </div>
-      <div className="dc-soft-panel p-5 lg:sticky lg:top-32 lg:self-start">
-        <h2 className="text-xl font-black uppercase tracking-[0.08em] text-[var(--dc-black)]">Order Summary</h2>
+      <div className="dc-checkout-summary dc-glass rounded-[var(--dc-radius-lg)] p-5 lg:sticky lg:top-32 lg:self-start">
+        <h2 className="text-xl font-black uppercase tracking-[0.08em] text-[var(--dc-heading)]">Order Summary</h2>
         <div className="mt-6 space-y-3 text-sm text-[var(--dc-muted)]">
           {items.map((item) => (
             <div
@@ -295,12 +300,17 @@ export function CheckoutForm({
                   : formatCurrency(shippingCharge)}
               </span>
             </div>
-            <p className="mt-2 text-xs text-[var(--dc-muted)]">
+            <p className="mt-2 text-sm text-[var(--dc-muted)]">
               {shippingSettings.mode === "free"
                 ? "Free delivery is active on every order."
                 : `Manual shipping charge: ${formatCurrency(shippingSettings.shippingCharge)}.`}
             </p>
-            <div className="mt-4 flex items-center justify-between text-lg font-black text-[var(--dc-black)]">
+            <div className="mt-3">
+              <Field label="Coupon code" error={errors.couponCode?.message}>
+                <Input defaultValue={couponCode} {...register("couponCode")} />
+              </Field>
+            </div>
+            <div className="mt-4 flex items-center justify-between text-lg font-black text-[var(--dc-heading)]">
               <span>Total</span>
               <span>{formatCurrency(total)}</span>
             </div>
@@ -310,29 +320,30 @@ export function CheckoutForm({
           <p className="text-sm font-black uppercase tracking-[0.18em] text-[var(--dc-muted)]">
             Payment method
           </p>
-          <label className="flex cursor-pointer items-start gap-3 rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] p-4 transition hover:border-[var(--dc-gold)]">
-            <input
-              type="radio"
-              value="Cash on Delivery"
-              {...register("paymentMethod")}
-              className="mt-1 h-4 w-4 accent-[var(--dc-gold)]"
+            <label className="flex cursor-pointer items-start gap-3 rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] p-4 transition hover:border-white">
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="razorpay"
+                defaultChecked
+                className="mt-1 h-4 w-4 accent-white"
             />
             <div>
-              <p className="font-bold text-[var(--dc-black)]">Cash on Delivery</p>
+              <p className="font-bold text-[var(--dc-heading)]">Cash on Delivery</p>
               <p className="mt-1 text-sm text-[var(--dc-muted)]">
                 Pay when your order reaches your doorstep.
               </p>
             </div>
           </label>
-          <label className="flex cursor-pointer items-start gap-3 rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] p-4 transition hover:border-[var(--dc-gold)]">
-            <input
-              type="radio"
-              value="Online Payment"
-              {...register("paymentMethod")}
-              className="mt-1 h-4 w-4 accent-[var(--dc-gold)]"
+            <label className="flex cursor-pointer items-start gap-3 rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] p-4 transition hover:border-white">
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="cod"
+                className="mt-1 h-4 w-4 accent-white"
             />
             <div>
-              <p className="font-bold text-[var(--dc-black)]">Online Payment</p>
+              <p className="font-bold text-[var(--dc-heading)]">Online Payment</p>
               <p className="mt-1 text-sm text-[var(--dc-muted)]">
                 {razorpayReady
                   ? "Pay securely with Razorpay using UPI, cards, wallets, and netbanking."
@@ -343,34 +354,53 @@ export function CheckoutForm({
           {errors.paymentMethod ? (
             <p className="text-sm text-red-600">{errors.paymentMethod.message}</p>
           ) : null}
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] bg-[var(--dc-surface-soft)] px-4 py-3">
+            <span className="inline-flex items-center gap-1.5 text-xs text-[var(--dc-muted)]">
+              <ShieldCheck className="h-3.5 w-3.5 text-[var(--dc-primary)]" />
+              Razorpay Secure
+            </span>
+            <span className="text-[var(--dc-muted-2)]">|</span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-[var(--dc-muted)]">
+              <ShieldCheck className="h-3.5 w-3.5 text-[var(--dc-primary)]" />
+              SSL Encrypted
+            </span>
+            <span className="text-[var(--dc-muted-2)]">|</span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-[var(--dc-muted)]">
+              <ExternalLink className="h-3.5 w-3.5 text-[var(--dc-primary)]" />
+              UPI &bull; Cards &bull; Netbanking
+            </span>
+          </div>
         </div>
-        <div className="mt-6 rounded-[var(--dc-radius-md)] border border-[#f3d7a0] bg-[var(--dc-cream)] p-4 text-sm text-[var(--dc-brown)]">
+        <div className="mt-6 rounded-[var(--dc-radius-md)] border border-[#f3d7a0] bg-[var(--dc-surface)] p-4 text-sm text-[var(--dc-heading)]">
           Login is required before checkout. COD orders stay pending until Vrixo confirms and processes them.
         </div>
-        <Button type="submit" className="mt-6 h-12 w-full rounded-full" disabled={isSubmitting || paymentBusy || !liveOrderReady}>
-          {isSubmitting || paymentBusy
-            ? selectedPaymentMethod === "Online Payment"
-              ? paymentBusy
-                ? "Processing..."
-                : "Processing..."
-              : "Processing..."
+        <Button type="submit" className="mt-6 h-12 w-full rounded-full" disabled={isSubmitting || checkoutBusy || paymentBusy || !liveOrderReady}>
+          {isSubmitting || checkoutBusy || paymentBusy
+            ? "Processing..."
             : selectedPaymentMethod === "Online Payment"
               ? "Pay Online"
               : "Place COD Order"}
         </Button>
+        <p className="mt-2 text-center text-xs text-[var(--dc-muted-2)]">
+          Your information is secure. Payments powered by Razorpay.
+        </p>
       </div>
     </form>
   );
 }
 
-async function postJson(url: string, body: Record<string, unknown>) {
+async function postJson(url: string, body: Record<string, unknown>, timeoutMs = 6500) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const requestId = getRequestId();
 
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-request-id": requestId
+      },
       body: JSON.stringify(body),
       signal: controller.signal
     });
@@ -385,7 +415,7 @@ async function postJson(url: string, body: Record<string, unknown>) {
       ok: false,
       payload: {
         message: aborted
-          ? "Checkout is taking longer than expected. Please try again."
+          ? "Checkout is busy. Please try again."
           : "Checkout failed. Please check your connection and try again."
       }
     };
@@ -396,9 +426,29 @@ async function postJson(url: string, body: Record<string, unknown>) {
 
 async function safeJson(response: Response) {
   try {
-    return (await response.json()) as Record<string, string>;
+    return (await response.json()) as Record<string, unknown>;
   } catch {
     return { message: response.ok ? "OK" : "Request failed." };
+  }
+}
+
+function getRequestId() {
+  return `web-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+}
+
+function getCheckoutIdempotencyKey() {
+  const storageKey = "vrixo-checkout-idempotency-key";
+  try {
+    const existing = window.sessionStorage.getItem(storageKey);
+    if (existing) return existing;
+    const next =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    window.sessionStorage.setItem(storageKey, next);
+    return next;
+  } catch {
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 }
 
@@ -407,6 +457,7 @@ function redirectToOrderSuccess(
   params: Record<string, string | undefined>
 ) {
   try {
+    window.sessionStorage.removeItem("vrixo-checkout-idempotency-key");
     window.location.assign(buildOrderSuccessPath(orderNumber, params));
   } catch {
     toast.error("Order placed, but redirect failed. Open My Orders to view your order.");

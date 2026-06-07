@@ -1,7 +1,32 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { Inter, Instrument_Serif, Poppins } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/react";
 import "@/styles/globals.css";
 import { Providers } from "@/components/providers";
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-poppins",
+  display: "swap",
+});
+
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: ["400"],
+  style: ["normal", "italic"],
+  variable: "--font-display",
+  display: "swap",
+});
 import { BehaviorTracker } from "@/components/store/behavior-tracker";
 import { getAppUrl } from "@/lib/app-url";
 import { BRAND_ICON_PATH, BRAND_LOGO_PATH, BRAND_NAME, DEFAULT_METADATA_DESCRIPTION, SUPPORT_EMAIL } from "@/lib/constants";
@@ -120,7 +145,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <html lang="en" data-scroll-behavior="smooth">
+    <html lang="en" data-scroll-behavior="smooth" className={`${inter.variable} ${poppins.variable} ${instrumentSerif.variable}`}>
+      <head>
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://images.unsplash.com" />
+        <link rel="dns-prefetch" href="https://vrixo.supabase.co" />
+      </head>
       <body>
         <script
           type="application/ld+json"
@@ -132,6 +163,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <BehaviorTracker />
           </Suspense>
         </Providers>
+        <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );

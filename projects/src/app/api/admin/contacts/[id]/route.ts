@@ -3,10 +3,11 @@ import { requireAdminApi } from "@/lib/server-guards";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireSameOrigin } from "@/lib/server/origin-check";
 import { serverError } from "@/lib/api-response";
+import { safeRoute } from "@/lib/safe-route";
 
 const allowedStatuses = new Set(["new", "read", "resolved"]);
 
-export async function PATCH(
+export const PATCH = safeRoute(async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -34,4 +35,4 @@ export async function PATCH(
   }
 
   return NextResponse.json({ message: "Contact updated." });
-}
+});

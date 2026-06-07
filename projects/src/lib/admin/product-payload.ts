@@ -24,6 +24,7 @@ export type ProductPayload = {
   featured: boolean;
   bestseller: boolean;
   new_arrival: boolean;
+  highlighted: boolean;
   status: ProductStatus;
   specifications: Record<string, string>;
 };
@@ -81,6 +82,7 @@ export function buildProductPayload(input: Record<string, unknown>) {
     featured: Boolean(input.featured),
     bestseller: Boolean(input.bestseller),
     new_arrival: Boolean(input.new_arrival),
+    highlighted: Boolean(input.highlighted),
     status: normalizeStatus(input.status),
     specifications
   };

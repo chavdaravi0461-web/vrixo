@@ -3,26 +3,18 @@ import { requireAdminApi } from "@/lib/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRecentEvents } from "@/lib/event-bus";
 import { withRedis } from "@/lib/redis";
+import { safeRoute } from "@/lib/safe-route";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export const GET = safeRoute(async function GET(request: Request) {
   const guard = await requireAdminApi(request);
   if (!guard.ok) return guard.response;
 
   const supabase = createAdminClient();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-  const [
-    { count: orders24h },
-    { count: pendingNotifications },
-    { count: failedNotifications },
-    { count: behavior24h },
-    { count: webhook24h },
-    { data: revenueRows },
-    redisStatus,
-    events
-  ] = await Promise.all([
+  const results = await Promise.allSettled([
     supabase.from("orders").select("id", { count: "exact", head: true }).gte("created_at", since),
     supabase.from("order_notifications").select("id", { count: "exact", head: true }).or("status.eq.pending,status.eq.retry_scheduled"),
     supabase.from("order_notifications").select("id", { count: "exact", head: true }).eq("status", "failed"),
@@ -35,6 +27,15 @@ export async function GET(request: Request) {
     }, "offline"),
     getRecentEvents(50)
   ]);
+
+  const orders24h = results[0].status === "fulfilled" ? results[0].value.count : 0;
+  const pendingNotifications = results[1].status === "fulfilled" ? results[1].value.count : 0;
+  const failedNotifications = results[2].status === "fulfilled" ? results[2].value.count : 0;
+  const behavior24h = results[3].status === "fulfilled" ? results[3].value.count : 0;
+  const webhook24h = results[4].status === "fulfilled" ? results[4].value.count : 0;
+  const revenueRows = results[5].status === "fulfilled" ? results[5].value.data : [];
+  const redisStatus = results[6].status === "fulfilled" ? results[6].value : "offline";
+  const events = results[7].status === "fulfilled" ? results[7].value : [];
 
   const revenue24h = (revenueRows ?? [])
     .filter((order) => String(order.order_status).toLowerCase() !== "cancelled")
@@ -58,5 +59,5 @@ export async function GET(request: Request) {
     },
     events
   });
-}
+});
 

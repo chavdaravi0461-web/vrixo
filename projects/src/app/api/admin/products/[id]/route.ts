@@ -6,11 +6,12 @@ import { logAdminAudit } from "@/lib/admin-audit";
 import { requireSameOrigin } from "@/lib/server/origin-check";
 import { serverError } from "@/lib/api-response";
 import { mapProductRow } from "@/services/products";
+import { safeRoute } from "@/lib/safe-route";
 
 const PRODUCT_DETAIL_SELECT =
   "id, slug, title, category, subcategory, brand, short_description, full_description, price, original_price, discount_percent, currency, stock, sku, sizes, colors, images, featured, bestseller, new_arrival, status, rating, review_count, specifications, created_at, updated_at";
 
-export async function GET(
+export const GET = safeRoute(async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -30,9 +31,9 @@ export async function GET(
   }
 
   return NextResponse.json({ product: mapProductRow(data as Record<string, unknown>) });
-}
+});
 
-export async function PATCH(
+export const PATCH = safeRoute(async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -79,6 +80,9 @@ export async function PATCH(
       metadata: { fields: Object.keys(update) }
     });
 
+    const { invalidateProductCache } = await import("@/services/products");
+    await invalidateProductCache();
+
     return NextResponse.json({ message: "Product updated successfully." });
   }
 
@@ -103,7 +107,9 @@ export async function PATCH(
     );
   }
 
-  const { error } = await supabase.from("products").update(payload).eq("id", id);
+  const updatePayload = { ...payload };
+  delete (updatePayload as Partial<typeof payload>).highlighted;
+  const { error } = await supabase.from("products").update(updatePayload).eq("id", id);
 
   if (error) {
     return serverError();
@@ -118,10 +124,13 @@ export async function PATCH(
     targetId: id
   });
 
-  return NextResponse.json({ message: "Product updated successfully." });
-}
+  const { invalidateProductCache } = await import("@/services/products");
+  await invalidateProductCache();
 
-export async function DELETE(
+  return NextResponse.json({ message: "Product updated successfully." });
+});
+
+export const DELETE = safeRoute(async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -163,6 +172,9 @@ export async function DELETE(
       metadata: { mode: "permanent" }
     });
 
+    const { invalidateProductCache } = await import("@/services/products");
+    await invalidateProductCache();
+
     return NextResponse.json({ message: "Product permanently deleted." });
   }
 
@@ -182,5 +194,8 @@ export async function DELETE(
     metadata: { mode: "archived" }
   });
 
+  const { invalidateProductCache } = await import("@/services/products");
+  await invalidateProductCache();
+
   return NextResponse.json({ message: "Product deactivated successfully." });
-}
+});

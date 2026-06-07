@@ -2,7 +2,7 @@ export default function ProductLoading() {
   return (
     <>
       <section className="dc-container mt-6">
-        <div className="dc-editorial-surface grid gap-5 p-4 lg:grid-cols-[1fr_0.95fr] lg:p-6">
+        <div className="dc-glass dc-glass-edge grid gap-5 p-4 lg:grid-cols-[1fr_0.95fr] lg:p-6">
           {/* Gallery Skeleton */}
           <div>
             <div className="aspect-square animate-pulse rounded-lg bg-[var(--dc-border)]" />
@@ -19,7 +19,7 @@ export default function ProductLoading() {
           {/* Details Skeleton */}
           <div className="p-2">
             <div className="h-3 w-24 animate-pulse bg-[var(--dc-border)]" />
-            <div className="mt-2 h-10 w-64 max-w-full animate-pulse bg-[var(--dc-border-dark)]" />
+            <div className="mt-2 h-10 w-64 max-w-full animate-pulse bg-[var(--dc-surface-strong)]" />
             
             {/* Rating Skeleton */}
             <div className="mt-3 flex gap-2">
@@ -29,7 +29,7 @@ export default function ProductLoading() {
 
             {/* Price Skeleton */}
             <div className="mt-5 flex gap-3">
-              <div className="h-10 w-32 animate-pulse bg-[var(--dc-border-dark)]" />
+              <div className="h-10 w-32 animate-pulse bg-[var(--dc-surface-strong)]" />
               <div className="h-8 w-24 animate-pulse bg-[var(--dc-border)]" />
             </div>
 
@@ -48,7 +48,7 @@ export default function ProductLoading() {
             </div>
 
             {/* Button Skeleton */}
-            <div className="mt-5 h-12 animate-pulse rounded-lg bg-[var(--dc-border-dark)]" />
+            <div className="mt-5 h-12 animate-pulse rounded-lg bg-[var(--dc-surface-strong)]" />
 
             {/* Accordions Skeleton */}
             <div className="mt-8 border-t border-[var(--dc-border)] pt-6 space-y-4">
@@ -67,7 +67,7 @@ export default function ProductLoading() {
       <section className="dc-container mt-16">
         <div className="mb-8">
           <div className="h-3 w-32 animate-pulse bg-[var(--dc-border)]" />
-          <div className="mt-2 h-8 w-48 animate-pulse bg-[var(--dc-border-dark)]" />
+          <div className="mt-2 h-8 w-48 animate-pulse bg-[var(--dc-surface-strong)]" />
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (

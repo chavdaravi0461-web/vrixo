@@ -147,7 +147,7 @@ export function ProductFormClient({ product }: { product?: Product }) {
       }
 
       toast.success(result.message ?? "Product saved.");
-      router.push("/dashboard-admin-dreamcart-ravi/products");
+      router.push("/dashboard-admin-vrixo-ravi/products");
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Product could not be saved.");

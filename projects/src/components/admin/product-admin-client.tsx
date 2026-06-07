@@ -17,7 +17,8 @@ import {
   Tag,
   Trash2,
   UploadCloud,
-  X
+  X,
+  Zap
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ export type AdminProductListItem = {
   featured: boolean;
   bestseller: boolean;
   newArrival: boolean;
+  highlighted: boolean;
   status: "active" | "draft" | "archived";
   createdAt: string;
 };
@@ -87,6 +89,7 @@ type ProductFormState = {
   featured: boolean;
   bestseller: boolean;
   new_arrival: boolean;
+  highlighted: boolean;
   status: "active" | "draft" | "archived";
   specifications: string;
 };
@@ -142,6 +145,7 @@ const emptyForm: ProductFormState = {
   featured: false,
   bestseller: false,
   new_arrival: true,
+  highlighted: false,
   status: "active",
   specifications: "{}"
 };
@@ -169,6 +173,7 @@ function fromProduct(product?: Product): ProductFormState {
     featured: product.featured,
     bestseller: product.bestseller,
     new_arrival: product.newArrival,
+    highlighted: product.highlighted,
     status: product.status ?? "active",
     specifications: JSON.stringify(product.specifications ?? {}, null, 2)
   };
@@ -240,7 +245,7 @@ export function ProductAdminClient({
     });
 
     const queryString = params.toString();
-    router.replace(`/dashboard-admin-dreamcart-ravi/products${queryString ? `?${queryString}` : ""}`, { scroll: false });
+    router.replace(`/dashboard-admin-vrixo-ravi/products${queryString ? `?${queryString}` : ""}`, { scroll: false });
   }, [categoryFilter, pagination.limit, pagination.page, router, searchInput, sortFilter, statusFilter]);
 
   useEffect(() => {
@@ -762,6 +767,16 @@ export function ProductAdminClient({
                   />
                 </div>
                 <Toggle icon={PackagePlus} label="New arrival" checked={form.new_arrival} onChange={(new_arrival) => setForm({ ...form, new_arrival })} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <HighlightBox
+                    icon={Zap}
+                    title="Highlight in Header"
+                    description="Header me blink effect ke sath dikhega."
+                    checked={form.highlighted}
+                    onChange={(highlighted) => setForm({ ...form, highlighted })}
+                  />
+                  <div />
+                </div>
               </div>
             </ProductFormSection>
 
@@ -802,7 +817,7 @@ export function ProductAdminClient({
               currentProducts.map((product) => (
                 <article
                   key={product.id}
-                  className="admin-lazy-row grid gap-4 border-b border-slate-200 p-4 transition last:border-b-0 hover:bg-slate-50 md:grid-cols-[88px_1fr_auto]"
+                  className="os-row grid gap-4 border-b border-[var(--os-border)] p-4 md:grid-cols-[88px_1fr_auto]"
                 >
                   <div className="relative h-[88px] w-[88px] overflow-hidden rounded-md bg-slate-100">
                     {product.image ? (
@@ -835,6 +850,7 @@ export function ProductAdminClient({
                       {product.featured ? <Badge tone="premium">Top Featured</Badge> : null}
                       {product.bestseller ? <Badge tone="premium">Best Seller</Badge> : null}
                       {product.newArrival ? <Badge tone="muted">New Arrival</Badge> : null}
+                      {product.highlighted ? <Badge tone="premium">Header Highlight</Badge> : null}
                     </div>
                     <div className="mt-3 grid gap-3 sm:grid-cols-[150px_1fr] sm:items-center">
                       <div>

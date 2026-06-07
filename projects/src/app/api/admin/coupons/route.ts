@@ -5,6 +5,7 @@ import { requireAdminApi } from "@/lib/server-guards";
 import { sanitizePlainText } from "@/lib/security";
 import { requireSameOrigin } from "@/lib/server/origin-check";
 import { serverError } from "@/lib/api-response";
+import { safeRoute } from "@/lib/safe-route";
 
 const adminCouponSchema = z.object({
   code: z.string().trim().min(3).max(40),
@@ -15,7 +16,7 @@ const adminCouponSchema = z.object({
   active: z.boolean().default(true)
 });
 
-export async function POST(request: Request) {
+export const POST = safeRoute(async function POST(request: Request) {
   const guard = await requireAdminApi(request);
   if (guard) return guard;
   const originError = requireSameOrigin(request);
@@ -46,4 +47,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ message: "Coupon created successfully." });
-}
+});

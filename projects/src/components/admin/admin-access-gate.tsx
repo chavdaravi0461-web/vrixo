@@ -30,7 +30,7 @@ export function AdminAccessGate() {
       }
 
       toast.success("Admin access unlocked.");
-      router.replace(searchParams.get("next") || "/dashboard-admin-dreamcart-ravi");
+      router.replace(searchParams.get("next") || "/dashboard-admin-vrixo-ravi");
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Access denied.");

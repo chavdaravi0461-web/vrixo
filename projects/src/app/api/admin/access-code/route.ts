@@ -6,8 +6,9 @@ import { adminCookieOptions, ADMIN_COOKIE_NAME, createAdminSessionToken } from "
 import { checkServerRateLimit } from "@/lib/rate-limit";
 import { logAdminAudit } from "@/lib/admin-audit";
 import { requireSameOrigin } from "@/lib/server/origin-check";
+import { safeRoute } from "@/lib/safe-route";
 
-export async function POST(request: NextRequest) {
+export const POST = safeRoute(async function POST(request: NextRequest) {
   // Access code is optional extra verification only. Supabase Auth + admin role + RLS are primary security.
   const originError = requireSameOrigin(request);
   if (originError) return originError;
@@ -92,4 +93,4 @@ export async function POST(request: NextRequest) {
   });
 
   return response;
-}
+});

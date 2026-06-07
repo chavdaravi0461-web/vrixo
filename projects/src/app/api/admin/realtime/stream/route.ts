@@ -1,10 +1,11 @@
 import { requireAdminApi } from "@/lib/require-admin";
 import { getRecentEvents, REALTIME_CHANNEL, type AppEvent } from "@/lib/event-bus";
-import { getRedis } from "@/lib/redis";
+import { getRedis, isRedisAvailable } from "@/lib/redis";
+import { safeRoute } from "@/lib/safe-route";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export const GET = safeRoute(async function GET(request: Request) {
   const guard = await requireAdminApi(request);
   if (!guard.ok) return guard.response;
 
@@ -20,30 +21,40 @@ export async function GET(request: Request) {
       send({ type: "connected", payload: { ts: new Date().toISOString() } });
       for (const event of await getRecentEvents(25)) send(event);
 
-      const subscriber = getRedis().duplicate();
       const interval = setInterval(() => send({ type: "heartbeat", payload: { ts: new Date().toISOString() } }), 25000);
 
-      try {
-        await subscriber.connect();
-        subscriber.on("message", (_channel, message) => {
-          try {
-            send(JSON.parse(message) as AppEvent);
-          } catch {
-            send({ type: "raw", payload: message });
-          }
-        });
-        await subscriber.subscribe(REALTIME_CHANNEL);
-      } catch {
+      if (isRedisAvailable()) {
+        const subscriber = getRedis()!.duplicate();
+        try {
+          await subscriber.connect();
+          subscriber.on("message", (_channel, message) => {
+            try {
+              send(JSON.parse(message) as AppEvent);
+            } catch {
+              send({ type: "raw", payload: message });
+            }
+          });
+          await subscriber.subscribe(REALTIME_CHANNEL);
+
+          abortSignal.addEventListener("abort", async () => {
+            clearInterval(interval);
+            try {
+              await subscriber.quit();
+            } catch {
+              subscriber.disconnect();
+            }
+            controller.close();
+          });
+          return;
+        } catch {
+          send({ type: "degraded", payload: { reason: "redis_unavailable" } });
+        }
+      } else {
         send({ type: "degraded", payload: { reason: "redis_unavailable" } });
       }
 
-      abortSignal.addEventListener("abort", async () => {
+      abortSignal.addEventListener("abort", () => {
         clearInterval(interval);
-        try {
-          await subscriber.quit();
-        } catch {
-          subscriber.disconnect();
-        }
         controller.close();
       });
     }
@@ -56,4 +67,4 @@ export async function GET(request: Request) {
       Connection: "keep-alive"
     }
   });
-}
+});

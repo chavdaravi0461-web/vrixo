@@ -3,8 +3,9 @@ import type { NextRequest } from "next/server";
 import { ADMIN_COOKIE_NAME, expiredAdminCookieOptions } from "@/lib/admin-auth";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route";
 import { isSupabaseConfigured } from "@/lib/utils";
+import { safeRoute } from "@/lib/safe-route";
 
-export async function POST(request: NextRequest) {
+export const POST = safeRoute(async function POST(request: NextRequest) {
   const response = NextResponse.json({
     success: true
   });
@@ -21,4 +22,4 @@ export async function POST(request: NextRequest) {
   });
 
   return response;
-}
+});

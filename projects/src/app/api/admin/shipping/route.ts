@@ -5,6 +5,7 @@ import { getShippingSettings, saveShippingSettings } from "@/lib/shipping-settin
 import { logAdminAudit } from "@/lib/admin-audit";
 import { requireSameOrigin } from "@/lib/server/origin-check";
 import { serverError } from "@/lib/api-response";
+import { safeRoute } from "@/lib/safe-route";
 
 const shippingSettingsSchema = z.object({
   mode: z.enum(["free", "paid"]),
@@ -12,16 +13,16 @@ const shippingSettingsSchema = z.object({
   freeShippingThreshold: z.coerce.number().finite().min(0).max(1000000)
 });
 
-export async function GET(request: Request) {
+export const GET = safeRoute(async function GET(request: Request) {
   const guard = await requireAdminApi(request);
   if (!guard.ok) return guard.response;
   const originError = requireSameOrigin(request);
   if (originError) return originError;
 
   return NextResponse.json({ settings: await getShippingSettings() });
-}
+});
 
-export async function PATCH(request: Request) {
+export const PATCH = safeRoute(async function PATCH(request: Request) {
   const guard = await requireAdminApi(request);
   if (!guard.ok) return guard.response;
 
@@ -53,4 +54,4 @@ export async function PATCH(request: Request) {
   } catch {
     return serverError("Shipping settings could not be saved.");
   }
-}
+});

@@ -1,6 +1,6 @@
 export const ADMIN_EMAIL = "chavdaravi0461@gmail.com";
-export const PRIVATE_ADMIN_PATH = "/dashboard-admin-dreamcart-ravi";
-export const LEGACY_ADMIN_PATHS = ["/admin", "/dreamcart-owner-panel"];
+export const PRIVATE_ADMIN_PATH = "/dashboard-admin-vrixo-ravi";
+export const LEGACY_ADMIN_PATHS = ["/admin", "/vrixo-owner-panel"];
 
 export function normalizeAdminEmail(value?: string | null) {
   return value?.trim().toLowerCase() ?? "";

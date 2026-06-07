@@ -4,14 +4,15 @@ import { getOptionalServerEnv } from "@/lib/env/server";
 import { processPendingNotifications } from "@/lib/notification-queue";
 import { securityLog } from "@/lib/security";
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   const env = getOptionalServerEnv();
   const secretHeader = request.headers.get("x-notification-worker-secret");
+  const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
   const requestUrl = new URL(request.url);
-  const secretQuery = requestUrl.searchParams.get("secret");
-  const secret = secretHeader || secretQuery || "";
+  const secret = secretHeader || bearer;
+  const configuredSecret = env.NOTIFICATION_WORKER_SECRET || process.env.CRON_SECRET || "";
 
-  if (!env.NOTIFICATION_WORKER_SECRET || secret !== env.NOTIFICATION_WORKER_SECRET) {
+  if (!configuredSecret || secret !== configuredSecret) {
     securityLog("notifications.retry.unauthorized", {
       path: requestUrl.pathname,
       source: request.headers.get("x-forwarded-for") ?? request.headers.get("host")
@@ -36,3 +37,6 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = handler;
+export const POST = handler;

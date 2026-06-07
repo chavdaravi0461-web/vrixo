@@ -7,6 +7,7 @@ import { getIndianMobileLookupVariants, normalizeIndianMobileNumber } from "@/li
 import { checkServerRateLimit } from "@/lib/rate-limit";
 import { tooManyRequests } from "@/lib/api-response";
 import { sanitizeRedirectPath } from "@/lib/safe-navigation";
+import { safeRoute } from "@/lib/safe-route";
 
 const passwordLoginSchema = z.object({
   identifier: z.string().trim().min(3),
@@ -14,7 +15,7 @@ const passwordLoginSchema = z.object({
   next: z.string().trim().max(500).optional()
 });
 
-export async function POST(request: NextRequest) {
+export const POST = safeRoute(async function POST(request: NextRequest) {
   const rateLimit = await checkServerRateLimit(request, { key: "login", limit: 8, windowMs: 60 * 1000 });
   if (!rateLimit.allowed) return tooManyRequests(rateLimit.retryAfter);
 
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
   }
 
   return response;
-}
+});
 
 async function findEmailForMobile(value: string) {
   const normalizedPhone = normalizeIndianMobileNumber(value);

@@ -8,6 +8,7 @@ import { getIndianMobileLookupVariants, normalizeIndianMobileNumber } from "@/li
 import { adminCookieOptions, ADMIN_COOKIE_NAME, createAdminSessionToken } from "@/lib/admin-auth";
 import { checkServerRateLimit, clearServerRateLimit } from "@/lib/rate-limit";
 import { logAdminAudit } from "@/lib/admin-audit";
+import { safeRoute } from "@/lib/safe-route";
 
 const adminLoginSchema = z.object({
   identifier: z.string().trim().min(3),
@@ -15,7 +16,7 @@ const adminLoginSchema = z.object({
   accessCode: z.string().trim().max(200).optional().or(z.literal(""))
 });
 
-export async function POST(request: NextRequest) {
+export const POST = safeRoute(async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const parsed = adminLoginSchema.safeParse(body);
   const identifier = parsed.success ? parsed.data.identifier.toLowerCase() : "invalid";
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
   });
 
   return response;
-}
+});
 
 async function invalidLogin(request: Request, email: string, reason: string, userId?: string) {
   await logAdminAudit({

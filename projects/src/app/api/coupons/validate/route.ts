@@ -3,8 +3,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/utils";
 import { validateCouponForCheckout } from "@/lib/game-coupons";
+import { safeRoute } from "@/lib/safe-route";
 
-export async function POST(request: Request) {
+export const POST = safeRoute(async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
     code?: string;
     subtotal?: number;
@@ -37,4 +38,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json(result);
-}
+});

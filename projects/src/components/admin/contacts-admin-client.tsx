@@ -44,17 +44,17 @@ export function ContactsAdminClient({ contacts }: { contacts: AdminContact[] }) 
   return (
     <div className="space-y-4">
       {contacts.map((contact) => (
-        <div key={contact.id} className="admin-card p-5 md:p-6">
+        <div key={contact.id} className="os-card p-4 md:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--os-text-3)]">
                 {contact.status ?? "new"} / {new Date(contact.created_at).toLocaleString("en-IN")}
               </p>
-              <h2 className="mt-2 text-xl font-semibold text-slate-950">{contact.subject}</h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <h2 className="mt-2 text-base font-bold text-[var(--os-text)]">{contact.subject}</h2>
+              <p className="mt-1 text-sm text-[var(--os-text-2)]">
                 {contact.name} / {contact.email} {contact.phone ? `/ ${contact.phone}` : ""}
               </p>
-              <p className="mt-3 text-sm leading-6 text-slate-600">{contact.message}</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--os-text-2)]">{contact.message}</p>
             </div>
             <div className="flex gap-2">
               <Button size="sm" className="rounded-2xl" onClick={() => updateStatus(contact.id, "read")}>

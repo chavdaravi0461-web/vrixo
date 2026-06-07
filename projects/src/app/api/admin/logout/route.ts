@@ -3,8 +3,9 @@ import type { NextRequest } from "next/server";
 import { ADMIN_COOKIE_NAME, expiredAdminCookieOptions } from "@/lib/admin-auth";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route";
 import { logAdminAudit } from "@/lib/admin-audit";
+import { safeRoute } from "@/lib/safe-route";
 
-export async function POST(request: NextRequest) {
+export const POST = safeRoute(async function POST(request: NextRequest) {
   const response = NextResponse.json({ success: true });
   const supabase = createRouteHandlerSupabaseClient(request, response);
 
@@ -16,4 +17,4 @@ export async function POST(request: NextRequest) {
   await logAdminAudit({ request, action: "admin.logout" });
 
   return response;
-}
+});

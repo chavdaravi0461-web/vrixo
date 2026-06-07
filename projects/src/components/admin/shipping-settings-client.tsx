@@ -44,12 +44,15 @@ export function ShippingSettingsClient({ settings }: { settings: ShippingSetting
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-      <section className="overflow-hidden admin-table-card">
-        <div className="admin-hero rounded-none p-6 text-white">
+      <section className="os-card">
+        <div className="p-5">
           <div className="relative z-10">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">Delivery control</p>
-          <h1 className="mt-2 text-4xl font-black">Shipping Charge</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+          <div className="flex items-center gap-2">
+            <span className="os-dot live" />
+            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-[var(--os-text-3)]">Delivery Control</span>
+          </div>
+          <h1 className="mt-3 text-2xl font-bold text-white md:text-3xl tracking-tight">Shipping Charge</h1>
+          <p className="mt-1 max-w-xl text-sm text-[var(--os-text-3)]">
             Set the delivery fee and the order value where Vrixo automatically gives free delivery.
           </p>
           </div>
@@ -76,14 +79,14 @@ export function ShippingSettingsClient({ settings }: { settings: ShippingSetting
         </div>
       </section>
 
-      <form className="admin-card p-5" onSubmit={saveSettings}>
+      <form className="os-card p-4" onSubmit={saveSettings}>
         <div className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-md bg-emerald-50 text-emerald-700">
-            <Truck className="h-5 w-5" />
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--os-accent-soft)] text-[var(--os-accent)]">
+            <Truck className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-xl font-bold text-slate-950">Delivery rule</h2>
-            <p className="mt-1 text-sm text-slate-500">Choose free delivery or paid delivery manually.</p>
+            <h2 className="text-sm font-bold text-[var(--os-text)]">Delivery rule</h2>
+            <p className="mt-0.5 text-[10px] text-[var(--os-text-3)]">Choose free delivery or paid delivery manually.</p>
           </div>
         </div>
         <div className="mt-6 grid gap-4">

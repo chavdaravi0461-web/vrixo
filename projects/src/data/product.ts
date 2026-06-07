@@ -36,6 +36,7 @@ export const products: Product[] = [
     featured: true,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.3,
     reviewCount: 23,
     specifications: {
@@ -83,6 +84,7 @@ export const products: Product[] = [
     featured: true,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.4,
     reviewCount: 26,
     specifications: {
@@ -125,6 +127,7 @@ export const products: Product[] = [
     featured: true,
     bestseller: true,
     newArrival: false,
+    highlighted: false,
     rating: 4.5,
     reviewCount: 29,
     specifications: {
@@ -167,6 +170,7 @@ export const products: Product[] = [
     featured: true,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.6,
     reviewCount: 32,
     specifications: {
@@ -208,6 +212,7 @@ export const products: Product[] = [
     featured: true,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.7,
     reviewCount: 35,
     specifications: {
@@ -245,6 +250,7 @@ export const products: Product[] = [
     featured: true,
     bestseller: true,
     newArrival: false,
+    highlighted: false,
     rating: 4.8,
     reviewCount: 38,
     specifications: {
@@ -287,6 +293,7 @@ export const products: Product[] = [
     featured: true,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.9,
     reviewCount: 41,
     specifications: {
@@ -330,6 +337,7 @@ export const products: Product[] = [
     featured: true,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.2,
     reviewCount: 44,
     specifications: {
@@ -365,6 +373,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: false,
+    highlighted: false,
     rating: 4.3,
     reviewCount: 47,
     specifications: {
@@ -406,6 +415,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.4,
     reviewCount: 50,
     specifications: {
@@ -452,6 +462,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.5,
     reviewCount: 53,
     specifications: {
@@ -491,6 +502,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: false,
+    highlighted: false,
     rating: 4.6,
     reviewCount: 56,
     specifications: {
@@ -524,6 +536,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.7,
     reviewCount: 59,
     specifications: {
@@ -564,6 +577,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.8,
     reviewCount: 62,
     specifications: {
@@ -603,6 +617,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: false,
+    highlighted: false,
     rating: 4.9,
     reviewCount: 65,
     specifications: {
@@ -647,6 +662,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.2,
     reviewCount: 68,
     specifications: {
@@ -688,6 +704,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.3,
     reviewCount: 71,
     specifications: {
@@ -724,6 +741,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: false,
+    highlighted: false,
     rating: 4.4,
     reviewCount: 74,
     specifications: {
@@ -772,6 +790,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.5,
     reviewCount: 77,
     specifications: {
@@ -811,6 +830,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.6,
     reviewCount: 80,
     specifications: {
@@ -855,6 +875,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: false,
+    highlighted: false,
     rating: 4.7,
     reviewCount: 83,
     specifications: {
@@ -894,6 +915,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.8,
     reviewCount: 86,
     specifications: {
@@ -946,6 +968,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.9,
     reviewCount: 89,
     specifications: {
@@ -987,6 +1010,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: false,
+    highlighted: false,
     rating: 4.2,
     reviewCount: 92,
     specifications: {
@@ -1031,6 +1055,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.3,
     reviewCount: 95,
     specifications: {
@@ -1071,6 +1096,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.4,
     reviewCount: 98,
     specifications: {
@@ -1110,6 +1136,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: false,
+    highlighted: false,
     rating: 4.5,
     reviewCount: 101,
     specifications: {
@@ -1150,6 +1177,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.6,
     reviewCount: 104,
     specifications: {
@@ -1191,6 +1219,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.7,
     reviewCount: 107,
     specifications: {
@@ -1227,6 +1256,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: false,
+    highlighted: false,
     rating: 4.8,
     reviewCount: 110,
     specifications: {
@@ -1269,6 +1299,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.9,
     reviewCount: 113,
     specifications: {
@@ -1309,6 +1340,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.2,
     reviewCount: 116,
     specifications: {
@@ -1346,6 +1378,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: false,
+    highlighted: false,
     rating: 4.3,
     reviewCount: 119,
     specifications: {
@@ -1383,6 +1416,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.4,
     reviewCount: 122,
     specifications: {
@@ -1420,6 +1454,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: false,
+    highlighted: false,
     rating: 4.5,
     reviewCount: 125,
     specifications: {
@@ -1456,6 +1491,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: false,
+    highlighted: false,
     rating: 4.6,
     reviewCount: 128,
     specifications: {
@@ -1496,6 +1532,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: true,
+    highlighted: false,
     rating: 4.7,
     reviewCount: 131,
     specifications: {
@@ -1533,6 +1570,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: true,
+    highlighted: false,
     rating: 4.8,
     reviewCount: 134,
     specifications: {
@@ -1571,6 +1609,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: true,
+    highlighted: false,
     rating: 4.9,
     reviewCount: 137,
     specifications: {
@@ -1615,6 +1654,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: true,
+    highlighted: false,
     rating: 4.2,
     reviewCount: 140,
     specifications: {
@@ -1663,6 +1703,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: true,
+    highlighted: false,
     rating: 4.3,
     reviewCount: 143,
     specifications: {
@@ -1706,6 +1747,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: true,
+    highlighted: false,
     rating: 4.4,
     reviewCount: 146,
     specifications: {
@@ -1744,6 +1786,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: true,
+    highlighted: false,
     rating: 4.5,
     reviewCount: 149,
     specifications: {
@@ -1791,6 +1834,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: true,
+    highlighted: false,
     rating: 4.6,
     reviewCount: 152,
     specifications: {
@@ -1827,6 +1871,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: true,
+    highlighted: false,
     rating: 4.7,
     reviewCount: 155,
     specifications: {
@@ -1870,6 +1915,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: true,
+    highlighted: false,
     rating: 4.8,
     reviewCount: 158,
     specifications: {
@@ -1909,6 +1955,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: false,
     newArrival: true,
+    highlighted: false,
     rating: 4.9,
     reviewCount: 161,
     specifications: {
@@ -1946,6 +1993,7 @@ export const products: Product[] = [
     featured: false,
     bestseller: true,
     newArrival: true,
+    highlighted: false,
     rating: 4.2,
     reviewCount: 164,
     specifications: {

@@ -1,10 +1,13 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+
 import { publishEvent } from "@/lib/event-bus";
 import { markCouponUsed } from "@/lib/game-coupons";
 import { recordPaidOrderMemory, trackBehaviorEvent } from "@/services/behavior/customer-intelligence";
-import { captureAppError, logInfo } from "@/lib/observability";
-import { getAppUrl } from "@/lib/app-url";
-import { dispatchOrderConfirmationWhatsApp } from "@/services/notifications/order-whatsapp";
+import { logInfo, logWarn, logError } from "@/lib/observability";
+import {
+  dispatchOrderNotification,
+  enqueueOrderConfirmationNotification
+} from "@/lib/notification-queue";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type PostOrderTaskInput = {
   orderId: string;
@@ -23,56 +26,107 @@ export type PostOrderTaskInput = {
   sessionId?: string | null;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
+  requestId?: string;
 };
 
-export async function runPostOrderTasks(input: PostOrderTaskInput) {
-  try {
-    await runPostOrderTasksInternal(input);
-  } catch (error) {
-    await captureAppError(error, { area: "post_order_tasks", orderId: input.orderId });
-  }
-}
+export type PostOrderTaskResult = {
+  whatsapp: { sent: boolean; skipped?: boolean; reason?: string; error?: string };
+  coupon: { used: boolean; error?: string };
+  events: { published: boolean };
+  behavior: { tracked: boolean };
+  memory: { updated: boolean };
+};
 
-async function runPostOrderTasksInternal(input: PostOrderTaskInput) {
-  logInfo("post_order_tasks.started", {
+export async function runPostOrderTasks(input: PostOrderTaskInput): Promise<PostOrderTaskResult> {
+  const startTime = performance.now();
+  logInfo("post_order_tasks.start", {
     orderId: input.orderId,
     orderNumber: input.orderNumber,
     paymentMethod: input.paymentMethod,
-    paymentStatus: input.paymentStatus
+    paymentStatus: input.paymentStatus,
+    requestId: input.requestId
   });
 
-  await Promise.allSettled([
-    withTaskTimeout("coupon.mark_used", () => markCouponUsed(input.couponCode ?? null, input.orderId), 2500),
-    withTaskTimeout("whatsapp.order_confirmation", () => sendCustomerWhatsApp(input), 15000),
-    withTaskTimeout("invoice.enqueue", () => enqueueInvoice(input), 3500),
-    withTaskTimeout("events.publish", () => publishOrderEvents(input), 3500),
-    withTaskTimeout("behavior.track", () => trackOrderBehavior(input), 3500),
+  const results = await Promise.allSettled([
+    withTaskTimeout("coupon.mark_used", () => markCouponUsed(input.couponCode ?? null, input.orderId), 5000),
+    withTaskTimeout("whatsapp.order_confirmation", () => sendCustomerWhatsApp(input), 20000),
+    withTaskTimeout("invoice.enqueue", () => enqueueInvoice(input), 5000),
+    withTaskTimeout("events.publish", () => publishOrderEvents(input), 5000),
+    withTaskTimeout("behavior.track", () => trackOrderBehavior(input), 5000),
     withTaskTimeout("memory.update", () => updateCustomerMemory(input), 5000)
   ]);
 
-  logInfo("post_order_tasks.completed", { orderId: input.orderId });
+  const [couponResult, whatsappResult, , eventsResult, behaviorResult, memoryResult] = results;
+  const whatsappValue =
+    whatsappResult.status === "fulfilled"
+      ? (whatsappResult.value as Awaited<ReturnType<typeof sendCustomerWhatsApp>>)
+      : null;
+  const whatsappOutput: PostOrderTaskResult["whatsapp"] =
+    whatsappResult.status === "fulfilled"
+      ? {
+          sent: Boolean(whatsappValue?.sent),
+          skipped: whatsappValue?.skipped,
+          reason: whatsappValue?.reason
+        }
+      : { sent: false, error: extractError(whatsappResult.reason) };
+
+  const output: PostOrderTaskResult = {
+    whatsapp: whatsappOutput,
+    coupon: couponResult.status === "fulfilled"
+      ? { used: true }
+      : { used: false, error: extractError(couponResult.reason) },
+    events: { published: eventsResult.status === "fulfilled" },
+    behavior: { tracked: behaviorResult.status === "fulfilled" },
+    memory: { updated: memoryResult.status === "fulfilled" }
+  };
+
+  logInfo("post_order_tasks.complete", {
+    orderId: input.orderId,
+    durationMs: Math.round(performance.now() - startTime),
+    ...output
+  });
+
+  return output;
 }
 
 async function sendCustomerWhatsApp(input: PostOrderTaskInput) {
-  const firstItem = input.items[0] ?? {};
-  const productNames =
-    input.items.map((item) => String(item.title ?? "")).filter(Boolean).join(", ") || "Vrixo product";
+  const logPayload = { orderId: input.orderId, orderNumber: input.orderNumber };
+  const supabase = createAdminClient();
+  try {
+    const notificationId = await enqueueOrderConfirmationNotification(supabase, input.orderId);
+    if (!notificationId) {
+      return {
+        queued: false,
+        sent: false,
+        skipped: true,
+        reason: "online_payment_not_confirmed"
+      };
+    }
 
-  await dispatchOrderConfirmationWhatsApp({
-    orderId: input.orderId,
-    userId: input.userId,
-    customerName: input.customerName,
-    customerPhone: input.customerPhone,
-    orderNumber: input.orderNumber,
-    productNames,
-    totalQty: input.items.reduce((sum, item) => sum + Number(item.quantity ?? 1), 0),
-    totalAmount: input.total,
-    orderStatus: input.orderStatus,
-    paymentMethod: input.paymentMethod,
-    paymentStatus: input.paymentStatus,
-    productImageUrl: resolveProductImageUrl(firstItem),
-    deliveryAddress: formatAddress(input.shippingAddress)
-  });
+    logInfo("post_order_tasks.whatsapp.outbox_enqueued", { ...logPayload, notificationId });
+    const result = await dispatchOrderNotification(supabase, notificationId);
+    if (result.sent) {
+      logInfo("post_order_tasks.whatsapp.sent", {
+        ...logPayload,
+        notificationId,
+        providerMessageId: result.providerMessageId
+      });
+      return { queued: true, sent: true };
+    }
+
+    logWarn("post_order_tasks.whatsapp.retry_scheduled", {
+      ...logPayload,
+      notificationId,
+      error: result.error
+    });
+    return { queued: true, sent: false, error: result.error ?? undefined };
+  } catch (error) {
+    logError("post_order_tasks.whatsapp.outbox_failed", {
+      ...logPayload,
+      error: extractError(error)
+    });
+    throw error;
+  }
 }
 
 async function enqueueInvoice(input: PostOrderTaskInput) {
@@ -129,41 +183,21 @@ async function updateCustomerMemory(input: PostOrderTaskInput) {
 async function withTaskTimeout(name: string, task: () => Promise<unknown>, timeoutMs: number) {
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    await Promise.race([
+    return await Promise.race([
       task(),
       new Promise((_, reject) => {
         timeout = setTimeout(() => reject(new Error(`${name} timed out after ${timeoutMs}ms`)), timeoutMs);
       })
     ]);
   } catch (error) {
-    await captureAppError(error, { area: name });
+    logWarn("post_order_tasks.task_failed", { taskName: name, error: extractError(error) });
+    throw error;
   } finally {
     if (timeout) clearTimeout(timeout);
   }
 }
 
-function resolveProductImageUrl(item: Record<string, unknown>) {
-  const raw = String(item.image ?? item.productImageUrl ?? "");
-  const appUrl = getAppUrl();
-
-  if (!raw) {
-    return `${appUrl}/placeholder-product.svg`;
-  }
-
-  try {
-    return new URL(raw, appUrl).toString();
-  } catch {
-    return `${appUrl}/placeholder-product.svg`;
-  }
-}
-
-function formatAddress(value: unknown) {
-  if (!value || typeof value !== "object") return "Delivery address saved with your order";
-  const address = value as Record<string, unknown>;
-  return (
-    [address.line1, address.line2, address.city, address.state, address.postalCode, address.country]
-      .map((part) => (part ? String(part).trim() : ""))
-      .filter(Boolean)
-      .join(", ") || "Delivery address saved with your order"
-  );
+function extractError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
 }

@@ -5,10 +5,12 @@ import { logAdminAudit } from "@/lib/admin-audit";
 import { requireSameOrigin } from "@/lib/server/origin-check";
 import { serverError } from "@/lib/api-response";
 import { publishEvent } from "@/lib/event-bus";
+import { updateOrderStatus, isTransitionAllowed } from "@/lib/orders/order-state-machine";
+import { safeRoute } from "@/lib/safe-route";
 
-const allowedStatuses = new Set(["processing", "shipped", "delivered", "cancelled"]);
+const allowedStatuses = new Set(["confirmed", "processing", "packed", "shipped", "delivered", "cancelled"]);
 
-export async function PATCH(
+export const PATCH = safeRoute(async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -26,13 +28,29 @@ export async function PATCH(
   }
 
   const supabase = createAdminClient();
-  const { error } = await supabase
-    .from("orders")
-    .update({ order_status: orderStatus })
-    .eq("id", id);
 
-  if (error) {
-    return serverError();
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, order_number, customer_name, customer_phone, order_status, payment_method, payment_status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!order) {
+    return NextResponse.json({ message: "Order not found." }, { status: 404 });
+  }
+
+  const result = await updateOrderStatus({
+    orderId: id,
+    orderNumber: order.order_number,
+    toStatus: orderStatus as "confirmed" | "processing" | "packed" | "shipped" | "delivered" | "cancelled",
+    changedBy: "admin",
+    changedById: guard.admin.user.id,
+    reason: `Admin updated from ${order.order_status} to ${orderStatus}`,
+    sendWhatsApp: true,
+  });
+
+  if (!result.success) {
+    return NextResponse.json({ message: result.error || "Failed to update order status." }, { status: 500 });
   }
 
   await logAdminAudit({
@@ -42,7 +60,7 @@ export async function PATCH(
     action: "order.status_update",
     targetTable: "orders",
     targetId: id,
-    metadata: { orderStatus }
+    metadata: { fromStatus: result.fromStatus, toStatus: orderStatus }
   });
 
   await publishEvent({
@@ -54,4 +72,4 @@ export async function PATCH(
   });
 
   return NextResponse.json({ message: "Order updated successfully." });
-}
+});

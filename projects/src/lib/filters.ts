@@ -1,6 +1,7 @@
 import type { Product } from "@/types/index";
 import { slugify } from "@/lib/utils";
 import { productMatchesAudience, uniqueProducts } from "@/lib/product-audience";
+import { productShowsIn, type ProductDisplaySection } from "@/lib/product-display";
 
 export type ProductQuery = {
   category?: string;
@@ -15,10 +16,15 @@ export type ProductQuery = {
   availability?: "in-stock";
   sort?: string;
   audience?: string;
+  displaySection?: ProductDisplaySection;
 };
 
 export function filterProducts(products: Product[], query: ProductQuery) {
   let results = uniqueProducts(products);
+
+  if (query.displaySection) {
+    results = results.filter((product) => productShowsIn(product, query.displaySection!));
+  }
 
   if (query.category) {
     results = results.filter((product) => product.category === query.category);

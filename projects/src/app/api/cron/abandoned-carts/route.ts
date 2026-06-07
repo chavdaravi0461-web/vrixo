@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { getAppUrl } from "@/lib/app-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enqueueAbandonedJob } from "@/services/abandoned/abandoned-queue";
+import { safeRoute } from "@/lib/safe-route";
 
-export async function POST(request: Request) {
+export const POST = safeRoute(async function POST(request: Request) {
   const secret = request.headers.get("x-cron-key");
   if (!secret || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -26,4 +27,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ processed: carts.length });
-}
+});

@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { hasServerSupabaseAdminEnv } from "@/lib/env/server";
 import { isSupabaseConfigured } from "@/lib/utils";
 import { checkServerRateLimit } from "@/lib/rate-limit";
+import { requireSameOrigin } from "@/lib/server/origin-check";
 
 export type RequiredAdmin = {
   user: {
@@ -25,6 +26,11 @@ export async function requireAdminApi(request: Request): Promise<
   | { ok: true; admin: RequiredAdmin }
   | { ok: false; response: NextResponse }
 > {
+  const originError = requireSameOrigin(request);
+  if (originError) {
+    return { ok: false, response: originError };
+  }
+
   if (!isSupabaseConfigured() || !hasServerSupabaseAdminEnv()) {
     return {
       ok: false,
@@ -80,6 +86,24 @@ export async function requireAdminApi(request: Request): Promise<
   }
 
   return { ok: true, admin: { user, profile } };
+}
+
+export async function requireOwnerAdminApi(request: Request): Promise<
+  | { ok: true; admin: RequiredAdmin }
+  | { ok: false; response: NextResponse }
+> {
+  const result = await requireAdminApi(request);
+
+  if (!result.ok) {
+    return result;
+  }
+
+  const email = result.admin.user.email ?? result.admin.profile.email;
+  if (!email || !isOwnerAdminEmail(email)) {
+    return { ok: false, response: NextResponse.json({ message: "Owner admin permission required." }, { status: 403 }) };
+  }
+
+  return result;
 }
 
 function getRequestCookie(request: Request, name: string) {

@@ -40,9 +40,10 @@ export async function uploadInvoiceToS3(buffer: Buffer, key: string) {
   const bucket = process.env.INVOICE_S3_BUCKET;
   if (!bucket) throw new Error("INVOICE_S3_BUCKET not configured");
 
-  const client = new S3Client({ region: process.env.AWS_REGION });
+  const region = process.env.AWS_REGION ?? "ap-south-1";
+  const client = new S3Client({ region });
   const command = new PutObjectCommand({ Bucket: bucket, Key: key, Body: buffer, ContentType: "application/pdf", ACL: "private" });
   await client.send(command);
-  const url = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${encodeURIComponent(key)}`;
+  const url = `https://${bucket}.s3.${region}.amazonaws.com/${encodeURIComponent(key)}`;
   return url;
 }

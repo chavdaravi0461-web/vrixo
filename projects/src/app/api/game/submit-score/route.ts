@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from "@/lib/utils";
 import { getRewardTier } from "@/game/utils/rewardTiers";
 import { validateGameScore } from "@/game/utils/antiCheat";
 import type { GameMode } from "@/game/utils/rewardTiers";
+import { safeRoute } from "@/lib/safe-route";
 
 type SubmitScoreBody = {
   score?: number;
@@ -16,7 +17,7 @@ type SubmitScoreBody = {
   mode?: GameMode;
 };
 
-export async function POST(request: Request) {
+export const POST = safeRoute(async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as SubmitScoreBody | null;
 
   if (!body) {
@@ -171,4 +172,4 @@ export async function POST(request: Request) {
       ...coupon
     }
   });
-}
+});

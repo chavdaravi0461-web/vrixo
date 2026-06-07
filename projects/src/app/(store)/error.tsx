@@ -16,11 +16,11 @@ export default function StoreError({
 
   return (
     <section className="dc-container py-16">
-      <div className="dc-soft-panel mx-auto max-w-xl p-8 text-center">
+      <div className="dc-glass rounded-[var(--dc-radius-lg)] mx-auto max-w-xl p-8 text-center">
         <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--dc-gold)]">
           Something went wrong
         </p>
-        <h1 className="mt-2 text-3xl font-black text-[var(--dc-black)]">We hit a routing issue</h1>
+        <h1 className="mt-2 text-3xl font-black text-[var(--dc-heading)]">We hit a routing issue</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--dc-muted)]">
           The page could not load safely. You can retry or continue shopping without losing your cart.
         </p>

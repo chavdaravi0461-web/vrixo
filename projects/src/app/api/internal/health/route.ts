@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { withRedis } from "@/lib/redis";
+import { checkAllDependencies, getSystemStatus, isDegraded, getAllDependencyStates } from "@/lib/dependency-health";
+import { safeRoute } from "@/lib/safe-route";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export const GET = safeRoute(async function GET(request: Request) {
   const token = request.headers.get("x-internal-token");
   const required = process.env.INTERNAL_API_TOKEN;
 
@@ -12,30 +12,27 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const [redis, database] = await Promise.all([
-    withRedis(async (client) => (await client.ping()) === "PONG", false),
-    checkDatabase()
-  ]);
-
-  const status = redis && database ? "ok" : "degraded";
+  const depStates = await checkAllDependencies();
+  const status = getSystemStatus();
+  const degraded = isDegraded();
 
   return NextResponse.json({
     status,
-    services: {
-      database,
-      redis,
+    degraded,
+    timestamp: new Date().toISOString(),
+    dependencies: depStates.map((d) => ({
+      name: d.name,
+      status: d.status,
+      failureCount: d.failureCount,
+      degraded: d.degradedMode,
+      lastFailureAt: d.lastFailureAt,
+    })),
+    env: {
       sentry: Boolean(process.env.SENTRY_DSN),
-      ai: Boolean(process.env.OPENAI_API_KEY)
+      razorpay: Boolean(process.env.RAZORPAY_KEY_ID),
+      whatsapp: Boolean(process.env.WHATSAPP_CLOUD_API_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN),
+      groq: Boolean(process.env.GROQ_API_KEY),
+      openai: Boolean(process.env.OPENAI_API_KEY),
     },
-    checkedAt: new Date().toISOString()
-  }, { status: status === "ok" ? 200 : 503 });
-}
-
-async function checkDatabase() {
-  try {
-    const result = await createAdminClient().from("orders").select("id", { count: "exact", head: true }).limit(1);
-    return !result.error;
-  } catch {
-    return false;
-  }
-}
+  }, { status: status === "healthy" ? 200 : status === "degraded" ? 200 : 503 });
+});

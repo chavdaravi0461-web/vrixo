@@ -19,7 +19,7 @@ export function FiltersSidebar({
   ).sort();
 
   return (
-    <aside className={cn("dc-soft-panel space-y-5 p-5 lg:sticky lg:top-32 lg:self-start", className)}>
+    <aside className={cn("dc-glass space-y-5 p-5 lg:sticky lg:top-32 lg:self-start", className)}>
       <div className="border-b border-[#efe6da] pb-3">
         <h2 className="text-lg font-black uppercase tracking-[0.08em] text-[#181510]">Filters</h2>
         <p className="mt-1 text-xs text-[#6b6256]">Refine by style, price, and availability</p>

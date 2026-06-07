@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { publishRealtime } from "@/lib/realtime";
+import { requireAnyHeaderSecret } from "@/lib/server/secret-guard";
 
 export async function POST(request: Request) {
-  const key = request.headers.get("x-admin-key");
-  if (!key || key !== process.env.ADMIN_API_KEY) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  const authError = requireAnyHeaderSecret(request, ["x-admin-key"], [process.env.ADMIN_API_KEY]);
+  if (authError) return authError;
 
   const body = await request.json().catch(() => ({}));
   const cmd = String(body.command ?? "");
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
   if (!cmd) return NextResponse.json({ message: "command required" }, { status: 400 });
 
   try {
-    await publishRealtime("realtime:commands", { command: cmd, payload, issuedBy: key, createdAt: new Date().toISOString() });
+    await publishRealtime("realtime:commands", { command: cmd, payload, issuedBy: "server", createdAt: new Date().toISOString() });
     return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json({ message: "failed", error: String(err) }, { status: 500 });

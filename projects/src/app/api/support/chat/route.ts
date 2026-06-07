@@ -1,60 +1,103 @@
-import { NextResponse } from "next/server";
-import { z } from "zod";
-import { handleWebChatMessage } from "@/lib/ai/support";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { checkServerRateLimit } from "@/lib/rate-limit";
-import { tooManyRequests } from "@/lib/api-response";
-import { trackBehaviorEvent } from "@/services/behavior/customer-intelligence";
+import { streamAIResponse } from "@/lib/ai/provider";
 
-const chatSchema = z.object({
-  message: z.string().trim().min(1).max(1200),
-  sessionId: z.string().trim().min(8).max(160).optional()
-});
+const SESSION_WINDOW = 30 * 60 * 1000;
+
+interface SessionStore {
+  [sessionId: string]: {
+    messages: Array<{ role: "user" | "assistant"; content: string }>;
+    expiresAt: number;
+  };
+}
+
+const sessions: SessionStore = {};
+
+function getSession(sessionId: string) {
+  const now = Date.now();
+  if (sessions[sessionId] && sessions[sessionId].expiresAt > now) {
+    return sessions[sessionId].messages;
+  }
+  sessions[sessionId] = { messages: [], expiresAt: now + SESSION_WINDOW };
+  return sessions[sessionId].messages;
+}
+
+function pruneExpiredSessions() {
+  const now = Date.now();
+  for (const key of Object.keys(sessions)) {
+    if (sessions[key].expiresAt <= now) delete sessions[key];
+  }
+}
+
+setInterval(pruneExpiredSessions, 5 * 60 * 1000);
+
+function safeParseBody(text: string) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(request: Request) {
-  const rateLimit = await checkServerRateLimit(request, {
-    key: "support-chat",
-    limit: 30,
-    windowMs: 10 * 60 * 1000
-  });
-
-  if (!rateLimit.allowed) {
-    return tooManyRequests(rateLimit.retryAfter);
-  }
-
-  const parsed = chatSchema.safeParse(await request.json().catch(() => null));
-
-  if (!parsed.success) {
-    return NextResponse.json(
-      { message: parsed.error.issues[0]?.message ?? "Invalid chat message." },
-      { status: 400 }
-    );
-  }
-
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  const start = Date.now();
 
   try {
-    const result = await handleWebChatMessage({
-      userId: user?.id,
-      message: parsed.data.message
+    const bodyText = await request.text();
+    const body = safeParseBody(bodyText);
+
+    if (!body || typeof body.message !== "string" || !body.message.trim()) {
+      return new Response(JSON.stringify({ message: "Message is required" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    const userMessage = body.message.trim();
+    const sessionId = typeof body.sessionId === "string" ? body.sessionId : crypto.randomUUID();
+
+    if (userMessage.length > 2000) {
+      return new Response(
+        JSON.stringify({ message: "Message too long. Please keep it under 2000 characters." }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      );
+    }
+
+    const history = getSession(sessionId);
+    history.push({ role: "user", content: userMessage });
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          const encoder = new TextEncoder();
+          for await (const chunk of streamAIResponse(history)) {
+            if (chunk) {
+              controller.enqueue(encoder.encode(chunk));
+            }
+          }
+          history.push({ role: "assistant", content: "" });
+          controller.close();
+          console.log(`[chat] session=${sessionId} duration=${Date.now() - start}ms`);
+        } catch (err) {
+          console.error("[chat] stream error:", err);
+          const encoder = new TextEncoder();
+          controller.enqueue(
+            encoder.encode("I'm sorry, something went wrong. Please try again or contact support."),
+          );
+          controller.close();
+        }
+      },
     });
 
-    void trackBehaviorEvent({
-      sessionId: parsed.data.sessionId ?? user?.id ?? "support-chat",
-      eventType: "support_open",
-      userId: user?.id ?? null,
-      path: "/support/chat",
-      metadata: { channel: "web_widget" }
-    }).catch(() => undefined);
-
-    return NextResponse.json({ reply: result.reply });
-  } catch {
-    return NextResponse.json(
-      { message: "AI support could not respond right now. Please try again shortly." },
-      { status: 500 }
+    return new Response(stream, {
+      headers: {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-cache, no-store, must-revalidate",
+      },
+    });
+  } catch (err) {
+    console.error("[chat] fatal error:", err);
+    return new Response(
+      JSON.stringify({ message: "Service unavailable. Please try again later." }),
+      { status: 500, headers: { "content-type": "application/json" } },
     );
   }
 }

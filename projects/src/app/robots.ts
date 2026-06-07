@@ -10,12 +10,12 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: [
         "/api/admin/",
-        "/dashboard-admin-dreamcart-ravi",
-        "/dashboard-admin-dreamcart-ravi/",
+        "/dashboard-admin-vrixo-ravi",
+        "/dashboard-admin-vrixo-ravi/",
         "/admin",
         "/admin/",
-        "/dreamcart-owner-panel",
-        "/dreamcart-owner-panel/"
+        "/vrixo-owner-panel",
+        "/vrixo-owner-panel/"
       ]
     },
     sitemap: `${base}/sitemap.xml`

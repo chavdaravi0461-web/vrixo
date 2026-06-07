@@ -1,4 +1,4 @@
--- DreamCart private admin hardening.
+-- Vrixo private admin hardening.
 -- Safe to rerun. This binds database-level admin checks to the single owner email.
 
 create extension if not exists pgcrypto;
@@ -63,14 +63,14 @@ begin
     and not public.is_admin(auth.uid())
     and coalesce(current_setting('request.jwt.claim.role', true), '') <> 'service_role'
   then
-    raise exception 'Only the DreamCart admin can change profile roles.';
+    raise exception 'Only the Vrixo admin can change profile roles.';
   end if;
 
   if lower(coalesce(old.email, '')) <> 'chavdaravi0461@gmail.com'
     and new.role = 'admin'
     and coalesce(current_setting('request.jwt.claim.role', true), '') <> 'service_role'
   then
-    raise exception 'Only the configured DreamCart owner email can be admin.';
+    raise exception 'Only the configured Vrixo owner email can be admin.';
   end if;
 
   return new;

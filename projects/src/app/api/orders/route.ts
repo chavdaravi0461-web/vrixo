@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasClientSupabaseEnv } from "@/lib/env/client";
@@ -5,253 +6,344 @@ import { hasServerSupabaseAdminEnv } from "@/lib/env/server";
 import { createPublicSupabaseClient } from "@/lib/supabase/public";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getSupabaseSetupHelpMessage } from "@/lib/supabase/setup-errors";
 import { validateCouponForCheckout } from "@/lib/game-coupons";
 import { addressSchema } from "@/lib/validations";
 import { secureCartItemsSchema } from "@/lib/security";
 import { calculateShippingCharge } from "@/lib/order-pricing";
-import { getShippingSettings } from "@/lib/shipping-settings";
+import { defaultShippingSettings, getShippingSettings } from "@/lib/shipping-settings";
 import { buildOrderSnapshotFromProducts } from "@/lib/server-order-utils";
-import { checkServerRateLimit } from "@/lib/rate-limit";
-import { serverError, tooManyRequests } from "@/lib/api-response";
 import { runPostOrderTasks } from "@/services/orders/post-order-tasks";
 import { sanitizeCustomerPhone } from "@/lib/whatsapp/phone";
+import { generateRequestId } from "@/lib/observability";
+import { withTimeout } from "@/lib/request-timeout";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const COD_RESPONSE_BUDGET_MS = 2800;
+const SUPABASE_INSERT_TIMEOUT_MS = 1800;
+const SECONDARY_WRITE_TIMEOUT_MS = 5000;
 
 const orderRequestSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   couponCode: z.string().trim().max(64).optional().or(z.literal("")),
   paymentMethod: z.enum(["Cash on Delivery", "cod"]).optional(),
   shippingAddress: addressSchema,
-  items: secureCartItemsSchema
+  items: secureCartItemsSchema,
+  idempotencyKey: z.string().trim().min(8).max(128).optional()
 });
 
+type SupabaseAdmin = ReturnType<typeof createAdminClient>;
+type SnapshotItem = Record<string, unknown>;
+const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+
+type CodOrderRecord = {
+  order_id: string;
+  order_number: string;
+  customer_name: string;
+  customer_phone: string;
+  idempotent_replay: boolean;
+};
+
 export async function POST(request: Request) {
-  const rateLimit = await checkServerRateLimit(request, { key: "checkout", limit: 12, windowMs: 10 * 60 * 1000 });
-  if (!rateLimit.allowed) return tooManyRequests(rateLimit.retryAfter);
-
-  const parsed = orderRequestSchema.safeParse(await request.json().catch(() => null));
-
-  if (!parsed.success) {
-    return NextResponse.json(
-      { message: parsed.error.issues[0]?.message ?? "Invalid order payload." },
-      { status: 400 }
-    );
-  }
-
-  const body = parsed.data;
-
-  if (!hasClientSupabaseEnv() || !hasServerSupabaseAdminEnv()) {
-    return serverError("Checkout is temporarily unavailable.");
-  }
-
-  const authSupabase = await createServerSupabaseClient();
-  const {
-    data: { user }
-  } = await authSupabase.auth.getUser();
-
-  const supabase = createPublicSupabaseClient();
-  const adminSupabase = createAdminClient();
-  let validatedCart: Awaited<ReturnType<typeof buildOrderSnapshotFromProducts>>;
-
-  const checkoutUser = user
-    ? { id: user.id, email: user.email ?? body.email ?? "" }
-    : null;
-
-  if (!checkoutUser) {
-    return NextResponse.json(
-      { message: "Please login or create an account before placing an order." },
-      { status: 401 }
-    );
-  }
+  const requestId = request.headers.get("x-request-id") || generateRequestId();
+  const startedAt = performance.now();
 
   try {
-    validatedCart = await buildOrderSnapshotFromProducts(supabase, body.items);
-  } catch {
-    return serverError(getSupabaseSetupHelpMessage("Failed to validate order items."));
-  }
+    console.info("[checkout.cod] request_start", JSON.stringify({ requestId, url: request.url }));
 
-  let discount = 0;
-  if (body.couponCode) {
-    const couponResult = await validateCouponForCheckout({
-      supabase: adminSupabase,
-      code: body.couponCode,
-      subtotal: validatedCart.subtotal,
-      userId: checkoutUser.id
+    const limited = checkMemoryRateLimit(request, {
+      key: "checkout-cod",
+      limit: 20,
+      windowMs: 10 * 60 * 1000
+    });
+    if (limited.blocked) {
+      return jsonError("Too many checkout attempts. Please try again shortly.", 429, "RATE_LIMITED", requestId);
+    }
+
+    const rawBody = await safeRequestJson(request);
+    const parsed = orderRequestSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
+      console.warn("[checkout.cod] validation_failed", JSON.stringify({ requestId, issue: firstIssue }));
+      return jsonError(firstIssue?.message ?? "Invalid checkout details.", 400, "VALIDATION_ERROR", requestId);
+    }
+
+    const body = parsed.data;
+    const idempotencyKey = body.idempotencyKey || buildFallbackIdempotencyKey(body.email, body.shippingAddress.phone, body.items);
+
+    if (!hasClientSupabaseEnv() || !hasServerSupabaseAdminEnv()) {
+      console.error("[checkout.cod] env_missing", JSON.stringify({ requestId }));
+      return jsonError("Checkout is temporarily unavailable.", 500, "ENV_MISSING", requestId);
+    }
+
+    const authSupabase = await createServerSupabaseClient();
+    const authResult = await withTimeout(
+      authSupabase.auth.getUser(),
+      1500,
+      "Supabase auth lookup timed out."
+    ).catch((error) => {
+      console.warn("[checkout.cod] auth_lookup_failed", JSON.stringify({ requestId, error: toErrorMessage(error) }));
+      return null;
     });
 
-    if (!couponResult.ok) {
-      return NextResponse.json({ message: couponResult.message }, { status: 400 });
+    const user = authResult?.data?.user ?? null;
+    if (!user) {
+      return jsonError("Please login or create an account before placing an order.", 401, "AUTH_REQUIRED", requestId);
     }
 
-    discount = couponResult.discount;
-  }
-
-  const shippingSettings = await getShippingSettings();
-  const shippingCharge = calculateShippingCharge(
-    validatedCart.subtotal,
-    validatedCart.snapshotItems,
-    shippingSettings
-  );
-  const secureTotal = validatedCart.subtotal + shippingCharge - discount;
-
-  try {
-    const { evaluatePaymentRisk, blockCustomer } = await import("@/services/fraud/fraud");
-    const risk = await withTimeout(evaluatePaymentRisk({
-      ip: getClientIp(request),
-      userAgent: request.headers.get("user-agent") || undefined,
-      userId: checkoutUser.id,
-      email: body.email || checkoutUser.email || "",
-      phone: String(body.shippingAddress.phone ?? ""),
-      paymentMethod: "cod",
-      shippingAddress: body.shippingAddress,
-      orderTotal: secureTotal,
-      items: validatedCart.snapshotItems
-    }), 1200, null);
-
-    if (risk?.action === "block") {
-      await blockCustomer(body.email || checkoutUser.email || "", String(body.shippingAddress.phone ?? ""), risk.flags.join(","), risk.deviceFingerprint);
-      return NextResponse.json({ message: "Order requires manual support review before checkout." }, { status: 403 });
+    const customerName = body.shippingAddress.fullName.trim();
+    const customerPhone = sanitizeCustomerPhone(body.shippingAddress.phone);
+    if (!customerPhone) {
+      return jsonError("Invalid phone number. Please provide a valid 10-digit Indian phone number.", 400, "INVALID_PHONE", requestId, "phone");
     }
-  } catch (error) {
-    console.warn("[orders.route] pre-order fraud check failed", error);
-  }
 
-  const pendingOrderStatus = "pending";
-  const codPaymentStatus = "cod_pending";
-  let order: {
-    order_id: string;
-    order_number: string;
-    customer_name: string;
-    customer_phone: string;
-    sms_item_names: string;
-    sms_total_qty: number;
-  };
+    const adminSupabase = createAdminClient();
+    const existing = await findExistingOrder(adminSupabase, idempotencyKey, requestId);
+    if (existing) {
+      console.info("[checkout.cod] idempotent_replay", JSON.stringify({ requestId, orderId: existing.order_id, orderNumber: existing.order_number }));
+      return jsonSuccess({
+        orderId: existing.order_id,
+        orderNumber: existing.order_number,
+        paymentMethod: "cod",
+        paymentStatus: "cod_pending",
+        orderStatus: "pending",
+        whatsappQueued: true,
+        idempotentReplay: true,
+        requestId
+      });
+    }
 
-  try {
-    order = await createPendingCodOrder({
+    const cart = await getSafeCartSnapshot(body.items, requestId);
+    const discount = await getSafeDiscount({
       supabase: adminSupabase,
-      userId: checkoutUser.id,
-      email: body.email || checkoutUser.email || "",
+      couponCode: body.couponCode,
+      subtotal: cart.subtotal,
+      userId: user.id,
+      requestId
+    });
+    const shippingSettings = await withTimeout(getShippingSettings(), 500, "Shipping settings timed out.")
+      .catch((error) => {
+        console.warn("[checkout.cod] shipping_settings_fallback", JSON.stringify({ requestId, error: toErrorMessage(error) }));
+        return defaultShippingSettings;
+      });
+    const shippingCharge = calculateShippingCharge(cart.subtotal, cart.snapshotItems, shippingSettings);
+    const total = Math.max(0, cart.subtotal + shippingCharge - discount);
+
+    const order = await insertCodOrder({
+      supabase: adminSupabase,
+      userId: user.id,
+      email: body.email || user.email || "",
+      customerName,
+      customerPhone,
       shippingAddress: body.shippingAddress,
       couponCode: body.couponCode,
-      snapshotItems: validatedCart.snapshotItems,
-      subtotal: validatedCart.subtotal,
+      snapshotItems: cart.snapshotItems,
+      subtotal: cart.subtotal,
       discount,
       shippingCharge,
-      total: secureTotal
+      total,
+      idempotencyKey,
+      requestId
     });
-  } catch {
-    return serverError(getSupabaseSetupHelpMessage("Failed to create order."));
+
+    void runSecondaryOrderWrites({
+      supabase: adminSupabase,
+      orderId: order.order_id,
+      userId: user.id,
+      email: body.email || user.email || "",
+      customerName,
+      customerPhone,
+      shippingAddress: body.shippingAddress,
+      snapshotItems: cart.snapshotItems,
+      total,
+      requestId
+    });
+
+    try {
+      await runPostOrderTasks({
+        orderId: order.order_id,
+        orderNumber: order.order_number,
+        userId: user.id,
+        customerName,
+        customerPhone,
+        customerEmail: body.email || user.email || "",
+        couponCode: body.couponCode,
+        orderStatus: "pending",
+        paymentMethod: "cod",
+        paymentStatus: "cod_pending",
+        total,
+        items: cart.snapshotItems,
+        shippingAddress: body.shippingAddress,
+        sessionId: request.headers.get("x-vrixo-session"),
+        requestId
+      });
+    } catch (error) {
+      console.warn("[checkout.cod] post_order_tasks_failed", JSON.stringify({ requestId, orderId: order.order_id, error: toErrorMessage(error) }));
+    }
+
+    const durationMs = Math.round(performance.now() - startedAt);
+    console.info("[checkout.cod] order_created", JSON.stringify({
+      requestId,
+      orderId: order.order_id,
+      orderNumber: order.order_number,
+      durationMs,
+      budgetMs: COD_RESPONSE_BUDGET_MS
+    }));
+
+    return jsonSuccess({
+      orderId: order.order_id,
+      orderNumber: order.order_number,
+      paymentMethod: "cod",
+      paymentStatus: "cod_pending",
+      orderStatus: "pending",
+      shippingCharge,
+      total,
+      whatsappQueued: true,
+      requestId
+    });
+  } catch (error) {
+    const durationMs = Math.round(performance.now() - startedAt);
+    const message = toErrorMessage(error);
+    console.error("[checkout.cod] request_failed", JSON.stringify({ requestId, durationMs, error: message }));
+    return jsonError(resolvePublicErrorMessage(message), 500, resolveErrorCode(message), requestId);
   }
-
-  await runPostOrderTasks({
-    orderId: order.order_id,
-    orderNumber: order.order_number,
-    userId: checkoutUser.id,
-    customerName: order.customer_name,
-    customerPhone: order.customer_phone,
-    customerEmail: body.email || checkoutUser.email || "",
-    couponCode: body.couponCode,
-    orderStatus: pendingOrderStatus,
-    paymentMethod: "cod",
-    paymentStatus: codPaymentStatus,
-    total: secureTotal,
-    items: validatedCart.snapshotItems,
-    shippingAddress: body.shippingAddress,
-    sessionId: request.headers.get("x-vrixo-session")
-  });
-
-  return NextResponse.json({
-    success: true,
-    orderId: order.order_id,
-    orderNumber: order.order_number,
-    paymentMethod: "cod",
-    paymentStatus: codPaymentStatus,
-    orderStatus: pendingOrderStatus,
-    shippingCharge,
-    total: secureTotal,
-    whatsappQueued: true
-  });
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T) {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
+async function safeRequestJson(request: Request) {
   try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((resolve) => {
-        timeout = setTimeout(() => resolve(fallback), timeoutMs);
-      })
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
+    return await request.json();
+  } catch {
+    return null;
   }
 }
 
-function getClientIp(request: Request) {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || request.headers.get("x-real-ip")
-    || undefined;
+async function getSafeCartSnapshot(items: z.infer<typeof secureCartItemsSchema>, requestId: string) {
+  try {
+    return await withTimeout(
+      buildOrderSnapshotFromProducts(createPublicSupabaseClient(), items),
+      900,
+      "Product validation timed out."
+    );
+  } catch (error) {
+    console.warn("[checkout.cod] product_validation_fallback", JSON.stringify({ requestId, error: toErrorMessage(error) }));
+    const snapshotItems = items.map((item) => ({
+      productId: item.productId,
+      slug: item.slug,
+      title: item.title,
+      image: item.image ?? "",
+      sku: "",
+      price: Number(item.price ?? 0),
+      quantity: Number(item.quantity ?? 1),
+      selectedSize: item.selectedSize ?? null,
+      selectedColor: item.selectedColor ?? null
+    }));
+    return {
+      snapshotItems,
+      subtotal: snapshotItems.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0)
+    };
+  }
 }
 
-async function createPendingCodOrder({
+async function getSafeDiscount({
+  supabase,
+  couponCode,
+  subtotal,
+  userId,
+  requestId
+}: {
+  supabase: SupabaseAdmin;
+  couponCode?: string;
+  subtotal: number;
+  userId: string;
+  requestId: string;
+}) {
+  if (!couponCode) return 0;
+
+  try {
+    const result = await withTimeout(
+      validateCouponForCheckout({ supabase, code: couponCode, subtotal, userId }),
+      700,
+      "Coupon validation timed out."
+    );
+    if (!result.ok) {
+      console.warn("[checkout.cod] coupon_rejected", JSON.stringify({ requestId, message: result.message }));
+      return 0;
+    }
+    return result.discount;
+  } catch (error) {
+    console.warn("[checkout.cod] coupon_validation_failed", JSON.stringify({ requestId, error: toErrorMessage(error) }));
+    return 0;
+  }
+}
+
+async function findExistingOrder(supabase: SupabaseAdmin, idempotencyKey: string, requestId: string): Promise<CodOrderRecord | null> {
+  try {
+    const { data, error } = await withTimeout(
+      Promise.resolve(supabase
+        .from("orders")
+        .select("id, order_number, customer_name, customer_phone")
+        .eq("idempotency_key", idempotencyKey)
+        .maybeSingle()),
+      800,
+      "Idempotency lookup timed out."
+    );
+    if (error) {
+      console.warn("[checkout.cod] idempotency_lookup_error", JSON.stringify({ requestId, error: error.message }));
+      return null;
+    }
+    if (!data?.id) return null;
+    return {
+      order_id: data.id,
+      order_number: data.order_number,
+      customer_name: data.customer_name ?? "",
+      customer_phone: data.customer_phone ?? "",
+      idempotent_replay: true
+    };
+  } catch (error) {
+    console.warn("[checkout.cod] idempotency_lookup_failed", JSON.stringify({ requestId, error: toErrorMessage(error) }));
+    return null;
+  }
+}
+
+async function insertCodOrder({
   supabase,
   userId,
   email,
+  customerName,
+  customerPhone,
   shippingAddress,
   couponCode,
   snapshotItems,
   subtotal,
   discount,
   shippingCharge,
-  total
+  total,
+  idempotencyKey,
+  requestId
 }: {
-  supabase: ReturnType<typeof createAdminClient>;
+  supabase: SupabaseAdmin;
   userId: string;
   email: string;
-  shippingAddress: Record<string, unknown>;
+  customerName: string;
+  customerPhone: string;
+  shippingAddress: z.infer<typeof addressSchema>;
   couponCode?: string;
-  snapshotItems: Array<Record<string, unknown>>;
+  snapshotItems: SnapshotItem[];
   subtotal: number;
   discount: number;
   shippingCharge: number;
   total: number;
-}) {
+  idempotencyKey: string;
+  requestId: string;
+}): Promise<CodOrderRecord> {
   const orderId = crypto.randomUUID();
-  const orderNumber = `DC-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${crypto
-    .randomUUID()
-    .slice(0, 6)
-    .toUpperCase()}`;
-  const customerName = String(shippingAddress.fullName ?? "").trim();
-  const customerPhone = sanitizeCustomerPhone(shippingAddress.phone);
+  const orderNumber = buildOrderNumber();
 
-  const { data: address, error: addressError } = await supabase
-    .from("addresses")
-    .insert({
-      user_id: userId,
-      full_name: customerName,
-      phone: customerPhone,
-      line1: String(shippingAddress.line1 ?? ""),
-      line2: shippingAddress.line2 ? String(shippingAddress.line2) : null,
-      city: String(shippingAddress.city ?? ""),
-      state: String(shippingAddress.state ?? ""),
-      postal_code: String(shippingAddress.postalCode ?? ""),
-      country: String(shippingAddress.country ?? "India"),
-      landmark: shippingAddress.landmark ? String(shippingAddress.landmark) : null,
-      is_default: false
-    })
-    .select("id")
-    .single();
-
-  if (addressError || !address) {
-    throw new Error("address_insert_failed");
-  }
-
-  const { error: orderError } = await supabase.from("orders").insert({
+  const payload = {
     id: orderId,
     order_number: orderNumber,
     user_id: userId,
-    address_id: address.id,
     items: snapshotItems,
     subtotal,
     discount,
@@ -261,63 +353,220 @@ async function createPendingCodOrder({
     payment_method: "cod",
     payment_status: "cod_pending",
     order_status: "pending",
-    shipping_address: shippingAddress,
+    shipping_address: {
+      ...shippingAddress,
+      phone: customerPhone
+    },
     customer_name: customerName,
     customer_phone: customerPhone,
     customer_email: email,
     coupon_code: couponCode ? couponCode.toUpperCase() : null,
     whatsapp_status: "pending",
+    idempotency_key: idempotencyKey,
     notes: {
-      email,
+      requestId,
+      checkoutMode: "fast_cod",
       strictCheckout: true,
-      codRequiresAdminConfirmation: true
+      codRequiresAdminConfirmation: true,
+      createdBy: "api/orders"
     }
-  });
+  };
 
-  if (orderError) {
-    throw new Error("order_insert_failed");
-  }
-
-  const { error: itemsError } = await supabase.from("order_items").insert(
-    snapshotItems.map((item) => ({
-      order_id: orderId,
-      product_id: item.productId,
-      title: String(item.title ?? ""),
-      sku: String(item.sku ?? ""),
-      price: Number(item.price ?? 0),
-      quantity: Number(item.quantity ?? 1),
-      selected_size: item.selectedSize ? String(item.selectedSize) : null,
-      selected_color: item.selectedColor ? String(item.selectedColor) : null,
-      product_snapshot: item
-    }))
+  const { data, error } = await withTimeout(
+    Promise.resolve(supabase
+      .from("orders")
+      .insert(payload)
+      .select("id, order_number, customer_name, customer_phone")
+      .single()),
+    SUPABASE_INSERT_TIMEOUT_MS,
+    "Order insert timed out."
   );
 
-  if (itemsError) {
-    throw new Error("order_items_insert_failed");
-  }
+  if (error) {
+    console.error("[checkout.cod] order_insert_error", JSON.stringify({ requestId, code: error.code, message: error.message, details: error.details }));
 
-  const { error: paymentError } = await supabase.from("payments").insert({
-    order_id: orderId,
-    provider: "manual",
-    amount: total,
-    currency: "INR",
-    method: "cod",
-    status: "cod_pending",
-    raw_response: {
-      strictCheckout: true
+    if (error.code === "23505") {
+      const existing = await findExistingOrder(supabase, idempotencyKey, requestId);
+      if (existing) return existing;
     }
-  });
 
-  if (paymentError) {
-    throw new Error("payment_insert_failed");
+    throw new Error(formatSupabaseOrderError(error.message, error.code));
   }
+
+  if (!data?.id) throw new Error("Order insert returned no order.");
 
   return {
-    order_id: orderId,
-    order_number: orderNumber,
-    customer_name: customerName,
-    customer_phone: customerPhone,
-    sms_item_names: snapshotItems.map((item) => String(item.title ?? "")).join(", "),
-    sms_total_qty: snapshotItems.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0)
+    order_id: data.id,
+    order_number: data.order_number,
+    customer_name: data.customer_name ?? customerName,
+    customer_phone: data.customer_phone ?? customerPhone,
+    idempotent_replay: false
   };
+}
+
+async function runSecondaryOrderWrites({
+  supabase,
+  orderId,
+  userId,
+  email,
+  customerName,
+  customerPhone,
+  shippingAddress,
+  snapshotItems,
+  total,
+  requestId
+}: {
+  supabase: SupabaseAdmin;
+  orderId: string;
+  userId: string;
+  email: string;
+  customerName: string;
+  customerPhone: string;
+  shippingAddress: z.infer<typeof addressSchema>;
+  snapshotItems: SnapshotItem[];
+  total: number;
+  requestId: string;
+}) {
+  try {
+    await withTimeout((async () => {
+      const { data: address, error: addressError } = await supabase
+        .from("addresses")
+        .insert({
+          user_id: userId,
+          full_name: customerName,
+          phone: customerPhone,
+          line1: shippingAddress.line1,
+          line2: shippingAddress.line2 || null,
+          city: shippingAddress.city,
+          state: shippingAddress.state,
+          postal_code: shippingAddress.postalCode,
+          country: shippingAddress.country || "India",
+          landmark: shippingAddress.landmark || null,
+          is_default: false
+        })
+        .select("id")
+        .single();
+
+      if (!addressError && address?.id) {
+        await supabase.from("orders").update({ address_id: address.id }).eq("id", orderId);
+      } else if (addressError) {
+        console.warn("[checkout.cod] secondary_address_failed", JSON.stringify({ requestId, orderId, error: addressError.message }));
+      }
+
+      const itemRows = snapshotItems.map((item) => ({
+        order_id: orderId,
+        product_id: item.productId,
+        title: String(item.title ?? ""),
+        sku: String(item.sku ?? ""),
+        price: Number(item.price ?? 0),
+        quantity: Number(item.quantity ?? 1),
+        selected_size: item.selectedSize ? String(item.selectedSize) : null,
+        selected_color: item.selectedColor ? String(item.selectedColor) : null,
+        product_snapshot: item
+      }));
+
+      const { error: itemsError } = await supabase.from("order_items").insert(itemRows);
+      if (itemsError) {
+        console.warn("[checkout.cod] secondary_items_failed", JSON.stringify({ requestId, orderId, error: itemsError.message }));
+      }
+
+      const { error: paymentError } = await supabase.from("payments").insert({
+        order_id: orderId,
+        provider: "manual",
+        amount: total,
+        currency: "INR",
+        method: "cod",
+        status: "cod_pending",
+        raw_response: { requestId, checkoutMode: "fast_cod", customerEmail: email }
+      });
+      if (paymentError) {
+        console.warn("[checkout.cod] secondary_payment_failed", JSON.stringify({ requestId, orderId, error: paymentError.message }));
+      }
+    })(), SECONDARY_WRITE_TIMEOUT_MS, "Secondary order writes timed out.");
+  } catch (error) {
+    console.warn("[checkout.cod] secondary_writes_failed", JSON.stringify({ requestId, orderId, error: toErrorMessage(error) }));
+  }
+}
+
+function buildOrderNumber() {
+  return `DC-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${crypto
+    .randomUUID()
+    .slice(0, 6)
+    .toUpperCase()}`;
+}
+
+function buildFallbackIdempotencyKey(email: string, phone: string, items: unknown) {
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify({ email, phone, items, bucket: Math.floor(Date.now() / (5 * 60 * 1000)) }))
+    .digest("hex");
+}
+
+function checkMemoryRateLimit(
+  request: Request,
+  options: { key: string; limit: number; windowMs: number }
+) {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    request.headers.get("cf-connecting-ip") ||
+    "unknown";
+  const key = `${options.key}:${ip}`;
+  const now = Date.now();
+  const current = rateLimitBuckets.get(key);
+
+  if (!current || current.resetAt <= now) {
+    rateLimitBuckets.set(key, { count: 1, resetAt: now + options.windowMs });
+    return { blocked: false };
+  }
+
+  current.count += 1;
+  return { blocked: current.count > options.limit };
+}
+
+function formatSupabaseOrderError(message: string, code?: string) {
+  const lower = message.toLowerCase();
+  if (code === "PGRST204" || lower.includes("column") || lower.includes("schema cache")) {
+    return "ORDER_SCHEMA_MISSING";
+  }
+  if (lower.includes("row-level security") || lower.includes("permission denied")) {
+    return "ORDER_RLS_BLOCKED";
+  }
+  return message || "ORDER_INSERT_FAILED";
+}
+
+function resolvePublicErrorMessage(message: string) {
+  if (message === "ORDER_SCHEMA_MISSING") {
+    return "Checkout database schema is missing required order columns. Please run the checkout repair SQL.";
+  }
+  if (message === "ORDER_RLS_BLOCKED") {
+    return "Checkout database permissions blocked order creation. Please run the checkout RLS repair SQL.";
+  }
+  if (message.includes("timed out")) {
+    return "Checkout is busy. Please try again.";
+  }
+  return "Order could not be placed. Please try again.";
+}
+
+function resolveErrorCode(message: string) {
+  if (message === "ORDER_SCHEMA_MISSING") return "ORDER_SCHEMA_MISSING";
+  if (message === "ORDER_RLS_BLOCKED") return "ORDER_RLS_BLOCKED";
+  if (message.includes("timed out")) return "CHECKOUT_TIMEOUT";
+  return "ORDER_CREATE_FAILED";
+}
+
+function jsonSuccess(payload: Record<string, unknown>) {
+  return NextResponse.json({ success: true, ...payload }, { status: 200 });
+}
+
+function jsonError(message: string, status: number, code: string, requestId: string, field?: string) {
+  return NextResponse.json(
+    { success: false, message, code, requestId, field },
+    { status }
+  );
+}
+
+function toErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return String(error);
 }

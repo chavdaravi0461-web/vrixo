@@ -32,7 +32,7 @@ export function AdminLoginForm() {
       }
 
       toast.success("Admin access verified.");
-      router.replace("/dashboard-admin-dreamcart-ravi");
+      router.replace("/dashboard-admin-vrixo-ravi");
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Admin login failed.");
@@ -42,18 +42,18 @@ export function AdminLoginForm() {
   }
 
   return (
-    <form className="admin-card p-6 md:p-8" onSubmit={submitLogin}>
+    <form className="os-card p-5 md:p-6" onSubmit={submitLogin}>
       <div className="flex items-center gap-3">
-        <span className="grid h-11 w-11 place-items-center rounded-full bg-teal-700 text-white">
-          <ShieldCheck className="h-5 w-5" />
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--os-accent-soft)] text-[var(--os-accent)]">
+          <ShieldCheck className="h-4 w-4" />
         </span>
         <div>
-          <h2 className="text-xl font-bold text-slate-950">Admin login</h2>
-          <p className="mt-1 text-sm text-slate-500">Use your admin email/password first.</p>
+          <h2 className="text-sm font-bold text-[var(--os-text)]">Admin login</h2>
+          <p className="mt-0.5 text-[10px] text-[var(--os-text-3)]">Use your admin email/password first.</p>
         </div>
       </div>
-      <label className="mt-6 block">
-        <span className="mb-2 block text-sm font-semibold text-slate-700">Admin email or mobile</span>
+      <label className="mt-5 block">
+        <span className="mb-1.5 block text-[10px] font-semibold text-[var(--os-text-2)]">Admin email or mobile</span>
         <Input
           value={identifier}
           onChange={(event) => setIdentifier(event.target.value)}

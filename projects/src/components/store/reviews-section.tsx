@@ -22,18 +22,18 @@ export function ReviewsSection({
   return (
     <section className="container mt-16 grid gap-6 lg:grid-cols-[1fr_0.8fr]">
       <div className="border border-[var(--dc-border)] bg-white p-6 shadow-sm md:p-8">
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--dc-gold)]">Verified voices</p>
-        <h2 className="mt-2 text-3xl font-black uppercase tracking-[0.04em] text-[var(--dc-black)]">Customer reviews</h2>
+        <p className="text-xs font-black uppercase tracking-[0.22em] text-white/70">Verified voices</p>
+        <h2 className="mt-2 text-3xl font-black uppercase tracking-[0.04em] text-[var(--dc-heading)]">Customer reviews</h2>
         <div className="mt-6 space-y-5">
           {reviews.length > 0 ? (
             reviews.map((review) => (
-              <div key={review.id} className="border border-[var(--dc-border)] bg-[var(--dc-cream)] p-5">
+              <div key={review.id} className="border border-[var(--dc-border)] bg-[var(--dc-surface)] p-5">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h3 className="font-bold text-[var(--dc-black)]">{review.title || "Verified review"}</h3>
+                    <h3 className="font-bold text-[var(--dc-heading)]">{review.title || "Verified review"}</h3>
                     <p className="mt-1 text-sm text-[var(--dc-muted)]">{review.userName}</p>
                   </div>
-                  <p className="text-sm font-black text-[var(--dc-gold-dark)]">{review.rating}/5</p>
+                  <p className="text-sm font-black text-white/80">{review.rating}/5</p>
                 </div>
                 <p className="mt-4 text-sm leading-7 text-[var(--dc-muted)]">{review.comment}</p>
               </div>
@@ -68,7 +68,7 @@ export function ReviewsSection({
           location.reload();
         }}
       >
-        <h2 className="text-3xl font-black uppercase tracking-[0.04em] text-[var(--dc-black)]">Write a review</h2>
+        <h2 className="text-3xl font-black uppercase tracking-[0.04em] text-[var(--dc-heading)]">Write a review</h2>
         <div className="mt-6 grid gap-4">
           <Input placeholder="Review title" value={title} onChange={(event) => setTitle(event.target.value)} />
           <Input

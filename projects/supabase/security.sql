@@ -1,5 +1,5 @@
 /*
-DreamCart Production Security SQL
+Vrixo Production Security SQL
 
 Admin access code alone = weak.
 Supabase Auth + admin role + RLS + server-side verification = strong.

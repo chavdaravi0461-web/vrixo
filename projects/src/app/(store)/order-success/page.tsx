@@ -51,7 +51,7 @@ export default async function OrderSuccessIndexPage({
         <p className="mt-5 text-sm font-black uppercase tracking-[0.22em] text-[var(--dc-gold)]">
           Order reference needed
         </p>
-        <h1 className="mt-3 text-3xl font-black text-[var(--dc-black)]">
+        <h1 className="mt-3 text-3xl font-black text-[var(--dc-heading)]">
           We could not open this confirmation
         </h1>
         <p className="mt-3 text-sm leading-6 text-[var(--dc-muted)]">

@@ -77,8 +77,8 @@ npm install
 2. Run the Supabase schema:
 
 - Open Supabase SQL Editor.
-- Run [`supabase/schema.sql`](/c:/Users/PC/OneDrive/Documents/Desktop/dreamcart final 4/supabase/schema.sql).
-- Run [`supabase/seed.sql`](/c:/Users/PC/OneDrive/Documents/Desktop/dreamcart final 4/supabase/seed.sql).
+- Run [`supabase/schema.sql`](/c:/Users/PC/OneDrive/Documents/Desktop/vrixo final 4/supabase/schema.sql).
+- Run [`supabase/seed.sql`](/c:/Users/PC/OneDrive/Documents/Desktop/vrixo final 4/supabase/seed.sql).
 
 3. Start development:
 
@@ -138,7 +138,7 @@ Online payment checkout runs in this order:
 
 ## SMS setup
 
-- Twilio is wired as the live provider structure in [`src/lib/sms.ts`](/c:/Users/PC/OneDrive/Documents/Desktop/dreamcart final 4/src/lib/sms.ts).
+- Twilio is wired as the live provider structure in [`src/lib/sms.ts`](/c:/Users/PC/OneDrive/Documents/Desktop/vrixo final 4/src/lib/sms.ts).
 - Add valid Twilio credentials and a verified sender number in `.env.local`.
 - If credentials are missing, the order is still saved and the SMS failure is logged to the order record.
 

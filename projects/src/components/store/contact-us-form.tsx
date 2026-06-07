@@ -56,7 +56,7 @@ export function ContactUsForm() {
   }
 
   return (
-    <form className="rounded-[2rem] bg-white p-6 card-shadow sm:p-8" onSubmit={submitForm}>
+    <form className="rounded-[2rem] bg-[var(--dc-surface)] p-6 card-shadow sm:p-8" onSubmit={submitForm}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Name">
           <Input
@@ -103,7 +103,7 @@ export function ContactUsForm() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-semibold text-slate-700">{label}</span>
+      <span className="mb-2 block text-sm font-semibold text-[var(--dc-text)]">{label}</span>
       {children}
     </label>
   );

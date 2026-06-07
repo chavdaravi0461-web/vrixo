@@ -3,7 +3,7 @@ import { getAppUrl } from "@/lib/app-url";
 export const metadata = {
   title: "About Vrixo | Vrixo",
   description:
-    "Vrixo is a premium online shopping brand founded by Chavda Ravi, offering shoes, watches, and fashion products with a clean, trusted, and customer-friendly shopping experience in India.",
+    "Vrixo is a premium online shopping brand , offering shoes, watches, and fashion products with a clean, trusted, and customer-friendly shopping experience in India.",
 };
 
 export default function AboutPage() {
@@ -23,23 +23,23 @@ export default function AboutPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f7f5ef] text-[#111827]">
+    <main className="min-h-screen bg-[var(--dc-bg)] text-[var(--dc-text)]">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
       />
 
       <section className="mx-auto max-w-6xl px-6 py-12 md:py-16">
-        <div className="rounded-3xl bg-white p-6 shadow-sm md:p-10">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.35em] text-[#9b7a2f]">
+        <div className="rounded-3xl bg-[var(--dc-surface)] p-6 md:p-10">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.35em] text-[var(--dc-primary)]">
             Vrixo
           </p>
 
-          <h1 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl">
+          <h1 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl text-[var(--dc-heading)]">
             About Vrixo
           </h1>
 
-          <p className="mb-6 text-lg leading-8 text-gray-700">
+          <p className="mb-6 text-lg leading-8 text-[var(--dc-muted)]">
             Vrixo is a premium online shopping brand built for customers who
             want quality, trust, and a smooth shopping experience without
             confusion. Our website, {appUrl}, focuses on stylish shoes,
@@ -47,21 +47,21 @@ export default function AboutPage() {
             and attractive for modern buyers.
           </p>
 
-          <div className="mb-8 rounded-2xl border border-[#d6b766] bg-[#fff8df] p-5">
-            <h2 className="mb-3 text-2xl font-bold text-[#111827]">
+          <div className="mb-8 rounded-2xl border border-[var(--dc-primary)]/40 bg-[var(--dc-primary-light)] p-5">
+            <h2 className="mb-3 text-2xl font-bold text-[var(--dc-heading)]">
               Founder
             </h2>
-            <p className="text-lg leading-8 text-gray-800">
-              <strong>Vrixo was founded by Chavda Ravi</strong> with the
+            <p className="text-lg leading-8 text-[var(--dc-text)]">
+              <strong>Vrixo was founded by Chavda Ravi and all Vrixo Team</strong> with the
               vision of building a trusted online shopping brand for shoes,
               watches, and fashion products in India.
             </p>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            <section className="rounded-2xl bg-[#fafafa] p-5">
-              <h2 className="mb-3 text-2xl font-bold">Our Story</h2>
-              <p className="leading-7 text-gray-700">
+            <section className="rounded-2xl bg-[var(--dc-surface-soft)] p-5">
+              <h2 className="mb-3 text-2xl font-bold text-[var(--dc-heading)]">Our Story</h2>
+              <p className="leading-7 text-[var(--dc-muted)]">
                 Vrixo started with a clear dream - to create an online
                 shopping platform that feels premium, simple, and trustworthy.
                 We are working to build a brand where customers can explore
@@ -70,18 +70,18 @@ export default function AboutPage() {
               </p>
             </section>
 
-            <section className="rounded-2xl bg-[#fafafa] p-5">
-              <h2 className="mb-3 text-2xl font-bold">What We Offer</h2>
-              <p className="leading-7 text-gray-700">
+            <section className="rounded-2xl bg-[var(--dc-surface-soft)] p-5">
+              <h2 className="mb-3 text-2xl font-bold text-[var(--dc-heading)]">What We Offer</h2>
+              <p className="leading-7 text-[var(--dc-muted)]">
                 At Vrixo, we focus on selected fashion and lifestyle products
                 such as shoes, watches, men&apos;s fashion products, women&apos;s
                 fashion products, new arrivals, and daily-use stylish products.
               </p>
             </section>
 
-            <section className="rounded-2xl bg-[#fafafa] p-5">
-              <h2 className="mb-3 text-2xl font-bold">Our Mission</h2>
-              <p className="leading-7 text-gray-700">
+            <section className="rounded-2xl bg-[var(--dc-surface-soft)] p-5">
+              <h2 className="mb-3 text-2xl font-bold text-[var(--dc-heading)]">Our Mission</h2>
+              <p className="leading-7 text-[var(--dc-muted)]">
                 Our mission is to make Vrixo a trusted online shopping
                 destination where customers can shop with confidence. We want to
                 provide a clean website experience, simple navigation, easy
@@ -89,9 +89,9 @@ export default function AboutPage() {
               </p>
             </section>
 
-            <section className="rounded-2xl bg-[#fafafa] p-5">
-              <h2 className="mb-3 text-2xl font-bold">Our Vision</h2>
-              <p className="leading-7 text-gray-700">
+            <section className="rounded-2xl bg-[var(--dc-surface-soft)] p-5">
+              <h2 className="mb-3 text-2xl font-bold text-[var(--dc-heading)]">Our Vision</h2>
+              <p className="leading-7 text-[var(--dc-muted)]">
                 Our vision is to grow Vrixo into a strong Indian e-commerce
                 brand known for trust, quality, and customer satisfaction. We
                 aim to build a shopping platform that feels premium, modern, and
@@ -102,7 +102,7 @@ export default function AboutPage() {
 
           <section className="mt-8 rounded-2xl bg-black p-6 text-white">
             <h2 className="mb-4 text-2xl font-bold">Why Choose Vrixo?</h2>
-            <ul className="grid list-disc gap-3 pl-5 text-gray-200 md:grid-cols-2">
+            <ul className="grid list-disc gap-3 pl-5 text-[#a0a0a8] md:grid-cols-2">
               <li>Premium and clean shopping experience</li>
               <li>Easy product browsing</li>
               <li>Simple cart and checkout process</li>
@@ -114,9 +114,9 @@ export default function AboutPage() {
             </ul>
           </section>
 
-          <section className="mt-8 rounded-2xl border border-gray-200 p-6">
-            <h2 className="mb-3 text-2xl font-bold">Our Promise</h2>
-            <p className="leading-8 text-gray-700">
+          <section className="mt-8 rounded-2xl border border-[var(--dc-border)] p-6">
+            <h2 className="mb-3 text-2xl font-bold text-[var(--dc-heading)]">Our Promise</h2>
+            <p className="leading-8 text-[var(--dc-muted)]">
               At Vrixo, we are committed to improving every day. We want to
               provide better products, better service, and a better shopping
               experience for our customers. Vrixo is not just a shopping
@@ -125,12 +125,12 @@ export default function AboutPage() {
             </p>
           </section>
 
-          <p className="mt-8 text-center text-lg font-semibold">
+          <p className="mt-8 text-center text-lg font-semibold text-[var(--dc-heading)]">
             Vrixo - Shop smart. Shop with trust.
           </p>
 
-          <p className="mt-4 text-center text-sm text-gray-500">
-            Copyright 2026 Vrixo. Founded by Chavda Ravi.
+          <p className="mt-4 text-center text-sm text-[var(--dc-muted-2)]">
+            Copyright 2026 Vrixo. Founded by all vrixo team.
           </p>
         </div>
       </section>

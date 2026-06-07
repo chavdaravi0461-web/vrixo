@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/utils";
 import { serverError } from "@/lib/api-response";
+import { safeRoute } from "@/lib/safe-route";
 
-export async function POST(request: Request) {
+export const POST = safeRoute(async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
     return serverError("Reviews are temporarily unavailable.");
   }
@@ -41,4 +42,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ message: "Review submitted for approval." });
-}
+});

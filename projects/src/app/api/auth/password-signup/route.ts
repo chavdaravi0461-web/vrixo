@@ -6,6 +6,7 @@ import { checkRateLimit } from "@/lib/security";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route";
 import { sanitizeRedirectPath } from "@/lib/safe-navigation";
+import { safeRoute } from "@/lib/safe-route";
 
 const passwordSignupSchema = z.object({
   name: z.string().trim().min(2, "Enter your full name."),
@@ -15,7 +16,7 @@ const passwordSignupSchema = z.object({
   next: z.string().trim().max(500).optional()
 });
 
-export async function POST(request: NextRequest) {
+export const POST = safeRoute(async function POST(request: NextRequest) {
   const rateLimit = checkRateLimit(request, { key: "signup", limit: 5, windowMs: 10 * 60 * 1000 });
   if (rateLimit) return rateLimit;
 
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
   }
 
   return response;
-}
+});
 
 function getSignupErrorMessage(message = "") {
   const lowerMessage = message.toLowerCase();

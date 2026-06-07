@@ -1,25 +1,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import crypto from "node:crypto";
-import { connectMongo } from "@/lib/mongo/models";
-import mongoose, { Schema } from "mongoose";
 import { publishEvent } from "@/lib/event-bus";
 import { withRedis } from "@/lib/redis";
 import { captureAppError } from "@/lib/observability";
+import { getAdaptiveThresholds, recordFraudOutcome } from "@/lib/adaptive-fraud";
 
 // Disposable email/phone provider list (common vendors)
 const DISPOSABLE_EMAIL_DOMAINS = ["tempmail.com", "10minutemail.com", "mailinator.com", "throwaway.email"];
 const DISPOSABLE_PHONE_PREFIXES = ["91911", "91999", "919876543"]; // India VoIP indicators
-
-// Fraud alert schema for persistence
-const FraudAlertSchema = new Schema({
-  orderId: { type: String, index: true },
-  score: Number,
-  flags: [String],
-  deviceFingerprint: String,
-  detectedAt: { type: Date, default: Date.now },
-  resolved: Boolean
-});
-const FraudAlert = mongoose.models.FraudAlert || mongoose.model("FraudAlert", FraudAlertSchema);
 
 // Device fingerprint computation
 function computeDeviceFingerprint(ua: string | undefined, ip: string | undefined): string {
@@ -65,15 +53,16 @@ export async function computeRiskScore(ctx: FraudContext): Promise<FraudDecision
   let score = 0;
   const flags: string[] = [];
   const deviceFingerprint = ctx.userAgent || ctx.ip ? computeDeviceFingerprint(ctx.userAgent, ctx.ip) : undefined;
+  const adaptiveThresholds = await getAdaptiveThresholds();
 
   if (await isBlocklisted(ctx.email ?? "", ctx.phone ?? "", deviceFingerprint)) {
     score += 90;
     flags.push("blocklisted_identity");
   }
 
-  // high order amount increases risk
-  if (ctx.orderTotal && ctx.orderTotal > 5000) score += 10;
-  if (ctx.orderTotal && ctx.orderTotal > 20000) score += 20;
+  // high order amount increases risk (adaptive thresholds)
+  if (ctx.orderTotal && ctx.orderTotal > adaptiveThresholds.highOrderAmount) score += 10;
+  if (ctx.orderTotal && ctx.orderTotal > adaptiveThresholds.extremeOrderAmount) score += 20;
 
   // disposable email/phone detection
   if (ctx.email && isDisposableEmail(ctx.email)) {
@@ -93,7 +82,7 @@ export async function computeRiskScore(ctx: FraudContext): Promise<FraudDecision
       if (count === 1) await redis.expire(fpKey, 86400 * 7);
       return count;
     }, 0);
-    if (fpCount > 5) {
+    if (fpCount > adaptiveThresholds.deviceReuseThreshold) {
         score += 15;
         flags.push("suspicious_device_reuse");
     }
@@ -120,11 +109,11 @@ export async function computeRiskScore(ctx: FraudContext): Promise<FraudDecision
       if (current === 1) await redis.expire(key, 60 * 60);
       return current;
     }, 0);
-    if (count > 3) {
+    if (count > adaptiveThresholds.ipVelocityWarn) {
         score += 20;
         flags.push("high_ip_velocity");
     }
-    if (count > 10) {
+    if (count > adaptiveThresholds.ipVelocityBlock) {
         score += 40;
         flags.push("extreme_ip_velocity");
     }
@@ -139,7 +128,7 @@ export async function computeRiskScore(ctx: FraudContext): Promise<FraudDecision
   // items with large quantity anomalies
   if (Array.isArray(ctx.items)) {
     for (const it of ctx.items) {
-      if (Number(it.quantity ?? 0) > 10) {
+      if (Number(it.quantity ?? 0) > adaptiveThresholds.bulkOrderThreshold) {
         score += 10;
         flags.push("bulk_order");
       }
@@ -156,7 +145,7 @@ export async function computeRiskScore(ctx: FraudContext): Promise<FraudDecision
         .select("id", { count: "exact", head: true })
         .eq(ctx.email ? "email" : "customer_phone", identifier)
         .in("order_status", ["cancelled", "returned"]);
-      if (count && count > 3) {
+      if (count && count > adaptiveThresholds.codAbuseCount) {
         score += ctx.paymentMethod === "cod" ? 35 : 20;
         flags.push("cod_abuse_pattern");
       }
@@ -171,18 +160,22 @@ export async function computeRiskScore(ctx: FraudContext): Promise<FraudDecision
   if (score > 100) score = 100;
   if (score < 0) score = 0;
 
-  const action = score >= 85 ? "block" : score >= 60 ? "review" : "allow";
-  return { score, action, flagged: score >= 50, flags, deviceFingerprint };
+  const action = score >= adaptiveThresholds.blockScore ? "block" : score >= adaptiveThresholds.reviewScore ? "review" : "allow";
+
+  await recordFraudOutcome(score, action, "unknown").catch(() => undefined);
+
+  return { score, action, flagged: score >= adaptiveThresholds.reviewScore, flags, deviceFingerprint };
 }
 
 export async function recordFraudAlert(orderId: string, details: Record<string, unknown>) {
   const supabase = createAdminClient();
   await supabase.from("fraud_alerts").insert({ order_id: orderId, details });
-  // persist to Mongo for analytics
-  try {
-    await connectMongo();
-    await FraudAlert.create({ orderId, ...details, resolved: false });
-  } catch {}
+  await withRedis(async (redis) => {
+    await redis.lpush("fraud:alerts", JSON.stringify({ orderId, details, createdAt: new Date().toISOString(), resolved: false }));
+    await redis.ltrim("fraud:alerts", 0, 999);
+    await redis.expire("fraud:alerts", 60 * 60 * 24 * 30);
+    return true;
+  }, false);
   // publish realtime alert
   await publishEvent({
     type: "fraud.alert",
@@ -229,13 +222,21 @@ export async function isBlocklisted(email: string, phone: string, deviceFingerpr
 }
 
 export async function getHighRiskOrders(limit = 50) {
-  await connectMongo();
-  return FraudAlert.find({ resolved: false }).sort({ detectedAt: -1 }).limit(limit).lean();
+  return withRedis(async (redis) => {
+    const rows = await redis.lrange("fraud:alerts", 0, Math.max(0, limit - 1));
+    return rows.map((row) => JSON.parse(row));
+  }, [] as Array<Record<string, unknown>>);
 }
 
 export async function markFraudResolved(alertId: string) {
-  await connectMongo();
-  await FraudAlert.findByIdAndUpdate(alertId, { resolved: true });
+  await createAdminClient()
+    .from("fraud_alerts")
+    .update({ resolved: true })
+    .eq("id", alertId);
+  await withRedis(async (redis) => {
+    await redis.setex(`fraud:resolved:${alertId}`, 60 * 60 * 24 * 30, "true");
+    return true;
+  }, false);
 }
 
 export async function isHighRiskOrder(ctx: FraudContext) {

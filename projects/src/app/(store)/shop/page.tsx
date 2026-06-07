@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { EmptyState } from "@/components/empty-state";
 import { FiltersSidebar } from "@/components/store/filters-sidebar";
-import { ProductGrid } from "@/components/store/product-grid";
+import { ProductGridPaginated } from "@/components/store/product-grid-paginated";
 import { ShopListingControls } from "@/components/store/shop-listing-controls";
 import { buildMetadata } from "@/lib/metadata";
 import { getProducts } from "@/services/products";
@@ -50,25 +50,25 @@ export default async function ShopPage({
     <section className="pb-12 pt-6">
       <div className="dc-container">
         <div className="dc-page-hero p-5 md:p-8">
-          <div className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-[#6b6256]">
-            <Link href="/home" className="hover:text-[#8a5a24]">Home</Link>
+          <div className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-[var(--dc-muted)]">
+            <Link href="/home" className="hover:text-[var(--dc-gold)]">Home</Link>
             <span>/</span>
-            <span className="text-[#181510]">Shop</span>
+            <span className="text-[var(--dc-heading)]">Shop</span>
           </div>
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#8a5a24]">
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--dc-gold)]">
                 Vrixo catalog
               </p>
-              <h1 className="mt-2 text-4xl font-black leading-tight text-[#181510] md:text-6xl">
+              <h1 className="mt-2 text-4xl font-black leading-tight text-[var(--dc-heading)] md:text-6xl">
                 Premium shoes and watches
               </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6b6256]">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--dc-muted)]">
                 Browse polished footwear and watch styles with secure checkout, COD, and verified online payments.
               </p>
             </div>
-            <div className="rounded-[var(--dc-radius-md)] bg-[#181510] px-5 py-4 text-white">
-              <p className="text-xs uppercase tracking-[0.18em] text-[#f3d7a0]">Showing</p>
+            <div className="rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] bg-[var(--dc-bg-deep)] px-5 py-4 text-[var(--dc-heading)]">
+              <p className="text-xs uppercase tracking-[0.18em] text-[var(--dc-gold)]">Showing</p>
               <p className="text-2xl font-bold">{products.length} products</p>
             </div>
           </div>
@@ -79,8 +79,8 @@ export default async function ShopPage({
                 href={chip.href}
                 className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.12em] transition ${
                   chip.active(current)
-                    ? "border-[#181510] bg-[#181510] text-white"
-                    : "border-[#e3d7c7] bg-white text-[#4a4036] hover:border-[#8a5a24] hover:text-[#8a5a24]"
+                    ? "border-[var(--dc-gold)] bg-[var(--dc-gold)] text-black"
+                    : "border-[var(--dc-border)] bg-[var(--dc-surface)] text-[var(--dc-muted)] hover:border-[var(--dc-gold)] hover:text-[var(--dc-heading)]"
                 }`}
               >
                 {chip.label}
@@ -102,7 +102,7 @@ export default async function ShopPage({
           <FiltersSidebar products={allProducts} current={current} className="hidden lg:block" />
           <div>
             {products.length > 0 ? (
-              <ProductGrid products={products} />
+              <ProductGridPaginated products={products} />
             ) : (
               <EmptyState
                 title="No products found"

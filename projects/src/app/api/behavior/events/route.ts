@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { checkServerRateLimit } from "@/lib/rate-limit";
 import { tooManyRequests } from "@/lib/api-response";
 import { trackBehaviorEvent } from "@/services/behavior/customer-intelligence";
+import { safeRoute } from "@/lib/safe-route";
 
 const behaviorEventSchema = z.object({
   sessionId: z.string().trim().min(8).max(160),
@@ -15,7 +16,7 @@ const behaviorEventSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional()
 });
 
-export async function POST(request: Request) {
+export const POST = safeRoute(async function POST(request: Request) {
   const rateLimit = await checkServerRateLimit(request, { key: "behavior-events", limit: 180, windowMs: 60 * 1000 });
   if (!rateLimit.allowed) return tooManyRequests(rateLimit.retryAfter);
 
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});
 
 async function hashIp(value: string) {
   if (!value) return "";

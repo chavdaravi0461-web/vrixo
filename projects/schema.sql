@@ -57,6 +57,7 @@ create table if not exists public.products (
   featured boolean not null default false,
   bestseller boolean not null default false,
   new_arrival boolean not null default false,
+  highlighted boolean not null default false,
   rating numeric(3,2) not null default 0,
   review_count integer not null default 0,
   status text not null default 'active' check (status in ('active', 'draft', 'archived')),
@@ -291,6 +292,7 @@ create index if not exists idx_products_category_id on public.products(category_
 create index if not exists idx_products_featured on public.products(featured);
 create index if not exists idx_products_bestseller on public.products(bestseller);
 create index if not exists idx_products_new_arrival on public.products(new_arrival);
+create index if not exists idx_products_highlighted on public.products(highlighted);
 create index if not exists idx_products_brand on public.products(brand);
 create index if not exists idx_product_images_product_id on public.product_images(product_id);
 create index if not exists idx_addresses_user_id on public.addresses(user_id);

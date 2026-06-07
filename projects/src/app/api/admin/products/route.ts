@@ -5,8 +5,9 @@ import { buildProductPayload } from "@/lib/admin/product-payload";
 import { logAdminAudit } from "@/lib/admin-audit";
 import { requireSameOrigin } from "@/lib/server/origin-check";
 import { serverError } from "@/lib/api-response";
+import { safeRoute } from "@/lib/safe-route";
 
-export async function POST(request: Request) {
+export const POST = safeRoute(async function POST(request: Request) {
   const guard = await requireAdminApi(request);
   if (!guard.ok) return guard.response;
   const originError = requireSameOrigin(request);
@@ -33,7 +34,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data, error } = await supabase.from("products").insert(payload).select("id, slug").single();
+  const insertPayload = { ...payload };
+  delete (insertPayload as Partial<typeof payload>).highlighted;
+  const { data, error } = await supabase.from("products").insert(insertPayload).select("id, slug").single();
 
   if (error) {
     return serverError();
@@ -49,5 +52,8 @@ export async function POST(request: Request) {
     metadata: { slug: data.slug }
   });
 
+  const { invalidateProductCache } = await import("@/services/products");
+  await invalidateProductCache();
+
   return NextResponse.json({ message: "Product created successfully.", product: data });
-}
+});

@@ -14,7 +14,7 @@ export default async function CartPage() {
     <section className="dc-container mt-6">
       <div className="dc-page-hero p-5 md:p-8">
         <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--dc-gold)]">Cart</p>
-        <h1 className="mt-1 text-4xl font-black leading-tight text-[var(--dc-black)] md:text-5xl">Review your cart</h1>
+        <h1 className="mt-1 text-4xl font-black leading-tight text-[var(--dc-heading)] md:text-5xl">Review your cart</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--dc-muted)]">Update quantities, remove items, and continue to secure checkout.</p>
       </div>
       <div className="mt-4">

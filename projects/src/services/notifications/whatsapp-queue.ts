@@ -1,6 +1,7 @@
 import { createQueue } from "@/lib/queue";
+import { logInfo } from "@/lib/observability";
 
-type WhatsAppJobPayload = {
+export type WhatsAppJobPayload = {
   orderId: string;
   orderNumber: string;
   customerName: string;
@@ -17,17 +18,26 @@ type WhatsAppJobPayload = {
 
 const queue = createQueue("whatsapp-jobs");
 
-export async function enqueueWhatsAppJob(payload: WhatsAppJobPayload, opts?: { attempts?: number }) {
+export async function enqueueWhatsAppJob(payload: WhatsAppJobPayload, opts?: { attempts?: number; delay?: number }) {
   const attempts = opts?.attempts ?? 5;
-  // job name intentionally simple
+  const delay = opts?.delay ?? 0;
+
+  logInfo("whatsapp_queue.enqueue", {
+    orderId: payload.orderId,
+    orderNumber: payload.orderNumber,
+    attempts,
+    delay
+  });
+
   await queue.add("send-order-whatsapp", payload, {
+    jobId: `order-whatsapp:${payload.orderId}`,
     attempts,
     backoff: {
       type: "exponential",
-      // initial 10 minutes expressed in ms
-      delay: 10 * 60 * 1000
+      delay: 2000
     },
     removeOnComplete: 100,
-    removeOnFail: 100
+    removeOnFail: 200,
+    delay
   });
 }

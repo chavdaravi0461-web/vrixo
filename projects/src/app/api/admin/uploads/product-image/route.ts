@@ -4,12 +4,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/utils";
 import { requireSameOrigin } from "@/lib/server/origin-check";
 import { serverError } from "@/lib/api-response";
+import { safeRoute } from "@/lib/safe-route";
 
 const bucket = "product-images";
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const allowedExtensions = new Set(["jpg", "jpeg", "png", "webp"]);
 
-export async function POST(request: Request) {
+export const POST = safeRoute(async function POST(request: Request) {
   const guard = await requireAdminApi(request);
   if (guard) return guard;
   const originError = requireSameOrigin(request);
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return NextResponse.json({ url: data.publicUrl, path });
-}
+});
 
 function getExtension(file: File) {
   const byType = file.type.split("/")[1];

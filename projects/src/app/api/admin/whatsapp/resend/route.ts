@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { enqueueWhatsAppJob } from "@/services/notifications/whatsapp-queue";
+import { requireAnyHeaderSecret } from "@/lib/server/secret-guard";
+import { safeRoute } from "@/lib/safe-route";
+import {
+  dispatchOrderNotification,
+  enqueueOrderConfirmationNotification
+} from "@/lib/notification-queue";
 
-export async function POST(request: Request) {
-  const key = request.headers.get("x-admin-key") || request.headers.get("x-server-key");
-  const secret = process.env.ADMIN_API_KEY || process.env.WHATSAPP_ADMIN_SECRET;
-
-  if (!secret || key !== secret) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+export const POST = safeRoute(async function POST(request: Request) {
+  const authError = requireAnyHeaderSecret(request, ["x-admin-key", "x-server-key"], [
+    process.env.ADMIN_API_KEY,
+    process.env.WHATSAPP_ADMIN_SECRET
+  ]);
+  if (authError) return authError;
 
   const body = await request.json().catch(() => ({}));
   const orderId = String(body.orderId ?? "");
@@ -20,38 +24,41 @@ export async function POST(request: Request) {
   const supabase = createAdminClient();
   const { data: order } = await supabase
     .from("orders")
-    .select("id, order_number, customer_name, customer_phone, total, items, order_status, payment_method, payment_status")
+    .select("id, whatsapp_status")
     .eq("id", orderId)
     .maybeSingle();
 
   if (!order) return NextResponse.json({ message: "order not found" }, { status: 404 });
+  if (order.whatsapp_status === "sent" || order.whatsapp_status === "delivered" || order.whatsapp_status === "read") {
+    return NextResponse.json(
+      { message: "WhatsApp confirmation was already sent. Duplicate resend blocked." },
+      { status: 409 }
+    );
+  }
 
-  // Enqueue WhatsApp job for resend
-  const paymentMethod =
-    String(order.payment_method ?? "").toLowerCase() === "cod" ? "cod" : "online";
+  const notificationId = await enqueueOrderConfirmationNotification(supabase, order.id);
+  if (!notificationId) {
+    return NextResponse.json({ message: "Order is not eligible for confirmation." }, { status: 409 });
+  }
 
-  await enqueueWhatsAppJob(
-    {
-      orderId: order.id,
-      orderNumber: order.order_number,
-      customerName: order.customer_name,
-      customerPhone: order.customer_phone,
-      productNames: Array.isArray(order.items)
-        ? order.items.map((item: { title?: string }) => item.title).filter(Boolean).join(", ") || ""
-        : "",
-      totalQty: Array.isArray(order.items)
-        ? order.items.reduce((sum: number, item: { quantity?: number }) => sum + Number(item.quantity ?? 1), 0)
-        : 1,
-      totalAmount: Number(order.total ?? 0),
-      orderStatus: String(order.order_status ?? "confirmed"),
-      paymentMethod,
-      paymentStatus: String(order.payment_status ?? (paymentMethod === "cod" ? "cod_pending" : "paid")),
-      productImageUrl:
-        Array.isArray(order.items) && order.items[0] ? String((order.items[0] as { image?: string }).image ?? "") : "",
-      deliveryAddress: ""
-    },
-    { attempts: 3 }
-  );
+  await supabase
+    .from("order_notifications")
+    .update({
+      status: "pending",
+      next_retry_at: new Date().toISOString(),
+      lease_expires_at: null,
+      locked_by: null,
+      last_error: null,
+      attempts: 0
+    })
+    .eq("id", notificationId)
+    .in("status", ["failed", "retry_scheduled", "pending"]);
 
-  return NextResponse.json({ ok: true, message: "whatsapp resend queued" });
-}
+  const result = await dispatchOrderNotification(supabase, notificationId);
+  return NextResponse.json({
+    ok: result.sent,
+    message: result.sent ? "WhatsApp confirmation sent." : "WhatsApp retry scheduled.",
+    error: result.error,
+    messageId: result.providerMessageId
+  });
+});

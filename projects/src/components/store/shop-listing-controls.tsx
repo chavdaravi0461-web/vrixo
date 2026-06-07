@@ -39,7 +39,7 @@ export function ShopListingControls({
 
   return (
     <>
-      <div className="dc-soft-panel p-3 md:p-4">
+      <div className="dc-shop-controls dc-glass p-3 md:p-4">
         <div className="grid gap-3 lg:grid-cols-[1fr_220px_auto] lg:items-center">
           <form onSubmit={submitSearch} className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -47,7 +47,7 @@ export function ShopListingControls({
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search shoes, watches, brands..."
-              className="dc-premium-input h-11 rounded-full border-[#d9cbb8] pl-10 shadow-none focus:border-[#8a5a24]"
+              className="dc-input h-11 pl-10"
             />
           </form>
           <ShopSort defaultValue={current.sort ?? ""} />
@@ -74,7 +74,7 @@ export function ShopListingControls({
             className="absolute inset-0 bg-slate-950/45"
             onClick={() => setFiltersOpen(false)}
           />
-          <div className="absolute bottom-0 left-0 right-0 max-h-[86vh] overflow-y-auto rounded-t-[28px] bg-white p-4 shadow-2xl">
+          <div className="dc-filter-sheet absolute bottom-0 left-0 right-0 max-h-[86vh] overflow-y-auto rounded-t-[28px] bg-white p-4 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8a5a24]">

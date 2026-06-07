@@ -1,18 +1,33 @@
 import { getOptionalServerEnv } from "@/lib/env/server";
-import { getAppUrl } from "@/lib/app-url";
 import { BRAND_NAME } from "@/lib/constants";
-import { buildPremiumOrderWhatsAppMessage } from "@/lib/whatsapp/order-template";
-import { formatWhatsAppPhone } from "@/lib/whatsapp/phone";
+import {
+  buildAdminOrderWhatsAppMessage,
+  buildPremiumOrderWhatsAppMessage
+} from "@/lib/whatsapp/order-template";
+import { formatWhatsAppPhone, toWhatsAppCloudRecipient } from "@/lib/whatsapp/phone";
 import { whatsappLog } from "@/lib/whatsapp/logger";
-import { isRetryableWhatsAppError, toWhatsAppErrorMessage, WhatsAppDispatchError } from "@/lib/whatsapp/errors";
+import {
+  isRetryableWhatsAppError,
+  toWhatsAppErrorMessage,
+  WhatsAppDispatchError
+} from "@/lib/whatsapp/errors";
+import { fetchWithTimeout, safeJson } from "@/lib/request-timeout";
+import { withProtection } from "@/lib/dependency-protection";
+import { isShuttingDown } from "@/lib/graceful-shutdown";
 
 export { formatWhatsAppPhone } from "@/lib/whatsapp/phone";
-export { buildPremiumOrderWhatsAppMessage, buildOrderTrackUrl } from "@/lib/whatsapp/order-template";
+export {
+  buildAdminOrderWhatsAppMessage,
+  buildPremiumOrderWhatsAppMessage,
+  buildOrderTrackUrl
+} from "@/lib/whatsapp/order-template";
 
 type WhatsAppServerEnv = {
   WHATSAPP_CLOUD_API_TOKEN: string;
   WHATSAPP_PHONE_NUMBER_ID: string;
   WHATSAPP_ADMIN_NUMBER: string;
+  WHATSAPP_TEMPLATE_LANGUAGE: string;
+  WHATSAPP_GRAPH_API_VERSION: string;
 };
 
 export type WhatsAppCustomerPayload = {
@@ -29,11 +44,34 @@ export type WhatsAppCustomerPayload = {
   deliveryAddress: string;
 };
 
+export type MetaWhatsAppResponse = {
+  messaging_product?: string;
+  contacts?: Array<{ input?: string; wa_id?: string }>;
+  messages?: Array<{ id?: string; message_status?: string }>;
+  error?: { message?: string; type?: string; code?: number; fbtrace_id?: string };
+};
+
+const RETRYABLE_META_ERROR_CODES = new Set([
+  1, 2, 4, 17, 32, 613, 80007, 130429, 131000, 131016, 131053
+]);
+
+function isRetryableMetaFailure(status: number, code?: number) {
+  return status === 408 ||
+    status === 425 ||
+    status === 429 ||
+    status >= 500 ||
+    (typeof code === "number" && RETRYABLE_META_ERROR_CODES.has(code));
+}
+
 export type WhatsAppSendResult = {
   sent: boolean;
   provider: "whatsapp";
   error: string | null;
   adminNotified: boolean;
+  customerMessageId?: string;
+  adminMessageId?: string;
+  customerResponse?: MetaWhatsAppResponse | null;
+  adminResponse?: MetaWhatsAppResponse | null;
 };
 
 const WHATSAPP_SEND_MAX_ATTEMPTS = 3;
@@ -43,10 +81,22 @@ export function getWhatsAppServerEnv(): WhatsAppServerEnv {
   const env = getOptionalServerEnv();
 
   return {
-    WHATSAPP_CLOUD_API_TOKEN: env.WHATSAPP_CLOUD_API_TOKEN,
+    WHATSAPP_CLOUD_API_TOKEN: env.WHATSAPP_CLOUD_API_TOKEN || env.WHATSAPP_ACCESS_TOKEN,
     WHATSAPP_PHONE_NUMBER_ID: env.WHATSAPP_PHONE_NUMBER_ID,
-    WHATSAPP_ADMIN_NUMBER: env.WHATSAPP_ADMIN_NUMBER
+    WHATSAPP_ADMIN_NUMBER: env.WHATSAPP_ADMIN_NUMBER,
+    WHATSAPP_TEMPLATE_LANGUAGE: env.WHATSAPP_TEMPLATE_LANGUAGE,
+    WHATSAPP_GRAPH_API_VERSION: env.WHATSAPP_GRAPH_API_VERSION
   };
+}
+
+function getOrderTemplateName(): string {
+  const name = getOptionalServerEnv().WHATSAPP_ORDER_TEMPLATE_NAME;
+  return name.trim() || "order_confirmation_vrixo";
+}
+
+function getMessagesEndpoint(phoneNumberId: string) {
+  const { WHATSAPP_GRAPH_API_VERSION } = getWhatsAppServerEnv();
+  return `https://graph.facebook.com/${WHATSAPP_GRAPH_API_VERSION}/${phoneNumberId}/messages`;
 }
 
 export function hasWhatsAppServerEnv() {
@@ -62,8 +112,21 @@ export function buildOrderWhatsAppCaption(payload: WhatsAppCustomerPayload) {
     totalAmount: payload.totalAmount,
     orderStatus: payload.orderStatus,
     paymentMethod: payload.paymentMethod,
-    paymentStatus: payload.paymentStatus
+    paymentStatus: payload.paymentStatus,
+    deliveryAddress: payload.deliveryAddress
   });
+}
+
+const WHATSAPP_CIRCUIT_FALLBACK: Response = new Response(
+  JSON.stringify({ error: { message: "WhatsApp API circuit open — degraded", code: 503 } }),
+  { status: 503, headers: { "Content-Type": "application/json" } }
+);
+
+async function circuitProtectedFetch(url: string, options: Record<string, unknown>, timeoutMs: number): Promise<Response> {
+  if (isShuttingDown()) {
+    throw new WhatsAppDispatchError("Server shutting down", "shutting_down", true);
+  }
+  return withProtection("whatsapp-cloud-api", () => fetchWithTimeout(url, options as any, timeoutMs), WHATSAPP_CIRCUIT_FALLBACK);
 }
 
 export async function sendWhatsAppImageMessage({
@@ -79,7 +142,11 @@ export async function sendWhatsAppImageMessage({
   token: string;
   phoneNumberId: string;
 }) {
-  const response = await fetchWithTimeout(`https://graph.facebook.com/v17.0/${phoneNumberId}/messages`, {
+  whatsappLog("info", "send_image.started", {
+    toSuffix: toWhatsAppCloudRecipient(to).slice(-4),
+    imageUrl: imageUrl.slice(0, 80)
+  });
+  const response = await circuitProtectedFetch(getMessagesEndpoint(phoneNumberId), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -87,21 +154,32 @@ export async function sendWhatsAppImageMessage({
     },
     body: JSON.stringify({
       messaging_product: "whatsapp",
-      to,
+      to: toWhatsAppCloudRecipient(to),
       type: "image",
       image: { link: imageUrl, caption }
     })
   }, 8000);
+  const payload = await safeJson<MetaWhatsAppResponse>(response);
 
   if (!response.ok) {
+    whatsappLog("error", "send_image.failed", {
+      status: response.status,
+      error: payload?.error?.message
+    });
     throw new WhatsAppDispatchError(
-      `WhatsApp image API failed (${response.status}).`,
+      payload?.error?.message || `WhatsApp image API failed (${response.status}).`,
       "whatsapp_image_failed",
-      response.status >= 500 || response.status === 429
+      isRetryableMetaFailure(response.status, payload?.error?.code)
     );
   }
 
-  return true;
+  whatsappLog("info", "send_image.sent", {
+    status: response.status,
+    toSuffix: toWhatsAppCloudRecipient(to).slice(-4),
+    messageId: payload?.messages?.[0]?.id ?? null
+  });
+
+  return payload;
 }
 
 export async function sendWhatsAppTextMessage({
@@ -115,7 +193,7 @@ export async function sendWhatsAppTextMessage({
   token: string;
   phoneNumberId: string;
 }) {
-  const response = await fetchWithTimeout(`https://graph.facebook.com/v17.0/${phoneNumberId}/messages`, {
+  const response = await circuitProtectedFetch(getMessagesEndpoint(phoneNumberId), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -123,21 +201,38 @@ export async function sendWhatsAppTextMessage({
     },
     body: JSON.stringify({
       messaging_product: "whatsapp",
-      to,
+      to: toWhatsAppCloudRecipient(to),
       type: "text",
       text: { body: text }
     })
   }, 8000);
+  const payload = await safeJson<MetaWhatsAppResponse>(response);
 
   if (!response.ok) {
+    const errorMsg = payload?.error?.message || `WhatsApp text API failed (${response.status}).`;
+    whatsappLog("error", "send_text.failed", {
+      status: response.status,
+      error: errorMsg,
+      code: payload?.error?.code,
+      type: payload?.error?.type,
+      fbtrace_id: payload?.error?.fbtrace_id
+    });
     throw new WhatsAppDispatchError(
-      `WhatsApp text API failed (${response.status}).`,
+      errorMsg,
       "whatsapp_text_failed",
-      response.status >= 500 || response.status === 429
+      isRetryableMetaFailure(response.status, payload?.error?.code)
     );
   }
 
-  return true;
+  console.log("[TRACE] MESSAGE_SENT", {
+    provider: "whatsapp_cloud_api",
+    type: "text",
+    status: response.status,
+    toSuffix: toWhatsAppCloudRecipient(to).slice(-4),
+    messageId: payload?.messages?.[0]?.id ?? null,
+  });
+
+  return payload;
 }
 
 export async function sendWhatsAppDocumentMessage({
@@ -153,7 +248,7 @@ export async function sendWhatsAppDocumentMessage({
   token: string;
   phoneNumberId: string;
 }) {
-  const response = await fetchWithTimeout(`https://graph.facebook.com/v17.0/${phoneNumberId}/messages`, {
+  const response = await circuitProtectedFetch(getMessagesEndpoint(phoneNumberId), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -161,21 +256,233 @@ export async function sendWhatsAppDocumentMessage({
     },
     body: JSON.stringify({
       messaging_product: "whatsapp",
-      to,
+      to: toWhatsAppCloudRecipient(to),
       type: "document",
       document: { link: documentUrl, filename: filename || "invoice.pdf" }
     })
   }, 10000);
+  const payload = await safeJson<MetaWhatsAppResponse>(response);
 
   if (!response.ok) {
     throw new WhatsAppDispatchError(
-      `WhatsApp document API failed (${response.status}).`,
+      payload?.error?.message || `WhatsApp document API failed (${response.status}).`,
       "whatsapp_document_failed",
-      response.status >= 500 || response.status === 429
+      isRetryableMetaFailure(response.status, payload?.error?.code)
     );
   }
 
-  return true;
+  return payload;
+}
+
+export type InteractiveButton = {
+  type: "reply";
+  reply: { id: string; title: string };
+};
+
+export type ListSection = {
+  title: string;
+  rows: Array<{ id: string; title: string; description?: string }>;
+};
+
+export async function sendWhatsAppInteractiveButtons({
+  to,
+  text,
+  buttons,
+  token,
+  phoneNumberId,
+  header,
+  footer,
+}: {
+  to: string;
+  text: string;
+  buttons: InteractiveButton[];
+  token: string;
+  phoneNumberId: string;
+  header?: string;
+  footer?: string;
+}) {
+  const body: Record<string, unknown> = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: toWhatsAppCloudRecipient(to),
+    type: "interactive",
+    interactive: {
+      type: "button",
+      body: { text },
+      action: { buttons },
+    },
+  };
+  if (header) (body.interactive as Record<string, unknown>).header = { type: "text", text: header };
+  if (footer) (body.interactive as Record<string, unknown>).footer = { type: "text", text: footer };
+
+  const response = await circuitProtectedFetch(getMessagesEndpoint(phoneNumberId), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  }, 8000);
+  const payload = await safeJson<MetaWhatsAppResponse>(response);
+
+  if (!response.ok) {
+    throw new WhatsAppDispatchError(
+      payload?.error?.message || `WhatsApp interactive button API failed (${response.status}).`,
+      "whatsapp_interactive_failed",
+      isRetryableMetaFailure(response.status, payload?.error?.code)
+    );
+  }
+
+  return payload;
+}
+
+export async function sendWhatsAppListMessage({
+  to,
+  text,
+  buttonText,
+  sections,
+  token,
+  phoneNumberId,
+  header,
+  footer,
+}: {
+  to: string;
+  text: string;
+  buttonText: string;
+  sections: ListSection[];
+  token: string;
+  phoneNumberId: string;
+  header?: string;
+  footer?: string;
+}) {
+  const body: Record<string, unknown> = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: toWhatsAppCloudRecipient(to),
+    type: "interactive",
+    interactive: {
+      type: "list",
+      header: header ? { type: "text", text: header } : undefined,
+      body: { text },
+      footer: footer ? { type: "text", text: footer } : undefined,
+      action: {
+        button: buttonText,
+        sections,
+      },
+    },
+  };
+
+  const response = await circuitProtectedFetch(getMessagesEndpoint(phoneNumberId), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  }, 8000);
+  const payload = await safeJson<MetaWhatsAppResponse>(response);
+
+  if (!response.ok) {
+    throw new WhatsAppDispatchError(
+      payload?.error?.message || `WhatsApp list message API failed (${response.status}).`,
+      "whatsapp_list_failed",
+      isRetryableMetaFailure(response.status, payload?.error?.code)
+    );
+  }
+
+  return payload;
+}
+
+export function buildOrderTemplateComponents(payload: WhatsAppCustomerPayload) {
+  const customerName = String(payload.customerName ?? "Customer").trim() || "Customer";
+  const productNames = String(payload.productNames ?? "Vrixo product").trim() || "Vrixo product";
+  const deliveryAddress =
+    String(payload.deliveryAddress ?? "Delivery address saved with your order").trim() ||
+    "Delivery address saved with your order";
+  const amount = new Intl.NumberFormat("en-IN", {
+    style: "currency", currency: "INR", maximumFractionDigits: 0
+  }).format(Math.max(0, Math.round(payload.totalAmount)));
+  const paymentLabel = payload.paymentMethod === "cod" ? "Cash on Delivery" : "Online";
+  return {
+    body: [
+      { type: "text", text: customerName },
+      { type: "text", text: payload.orderNumber },
+      { type: "text", text: productNames },
+      { type: "text", text: paymentLabel },
+      { type: "text", text: deliveryAddress },
+      { type: "text", text: amount }
+    ]
+  };
+}
+
+export async function sendWhatsAppTemplateMessage({
+  to,
+  templateName,
+  bodyParameters,
+  buttonParameters,
+  token,
+  phoneNumberId
+}: {
+  to: string;
+  templateName: string;
+  bodyParameters: Array<{ type: string; text: string }>;
+  buttonParameters?: Array<{ type: string; url: string; index: number }>;
+  token: string;
+  phoneNumberId: string;
+}) {
+  const components: Array<Record<string, unknown>> = [
+    {
+      type: "body",
+      parameters: bodyParameters
+    }
+  ];
+
+  if (buttonParameters && buttonParameters.length > 0) {
+    components.push({
+      type: "button",
+      sub_type: "url",
+      index: "0",
+      parameters: buttonParameters
+    });
+  }
+
+  const body: Record<string, unknown> = {
+    messaging_product: "whatsapp",
+    to: toWhatsAppCloudRecipient(to),
+    type: "template",
+    template: {
+      name: templateName,
+      language: { code: getWhatsAppServerEnv().WHATSAPP_TEMPLATE_LANGUAGE },
+      components
+    }
+  };
+
+  const response = await circuitProtectedFetch(getMessagesEndpoint(phoneNumberId), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  }, 8000);
+  const payload = await safeJson<MetaWhatsAppResponse>(response);
+
+  if (!response.ok) {
+    throw new WhatsAppDispatchError(
+      payload?.error?.message || `WhatsApp template API failed (${response.status}).`,
+      "whatsapp_template_failed",
+      isRetryableMetaFailure(response.status, payload?.error?.code)
+    );
+  }
+
+  whatsappLog("info", "send_template.sent", {
+    status: response.status,
+    toSuffix: toWhatsAppCloudRecipient(to).slice(-4),
+    templateName,
+    messageId: payload?.messages?.[0]?.id ?? null
+  });
+
+  return payload;
 }
 
 export async function sendWhatsAppProductCarousel({
@@ -191,23 +498,14 @@ export async function sendWhatsAppProductCarousel({
   phoneNumberId: string;
   caption?: string;
 }) {
+  const responses: Array<MetaWhatsAppResponse | null> = [];
   for (const product of products) {
     const text =
-      `${product.title}\nPrice: ₹${product.price}\n${product.link}` + (caption ? `\n\n${caption}` : "");
-    await sendWhatsAppImageMessage({ to, caption: text, imageUrl: product.imageUrl, token, phoneNumberId });
+      `${product.title}\nPrice: INR ${product.price}\n${product.link}` + (caption ? `\n\n${caption}` : "");
+    responses.push(await sendWhatsAppImageMessage({ to, caption: text, imageUrl: product.imageUrl, token, phoneNumberId }));
   }
 
-  return true;
-}
-
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
+  return responses;
 }
 
 async function sleep(ms: number) {
@@ -240,10 +538,17 @@ async function withWhatsAppRetries<T>(label: string, task: () => Promise<T>) {
   throw lastError;
 }
 
-/** Sends premium order confirmation (image + caption, text fallback). Order save must not depend on this. */
 export async function sendOrderConfirmationWhatsApp(
   payload: WhatsAppCustomerPayload
 ): Promise<WhatsAppSendResult> {
+  whatsappLog("info", "order_confirmation.started", {
+    orderNumber: payload.orderNumber,
+    paymentMethod: payload.paymentMethod,
+    paymentStatus: payload.paymentStatus,
+    phoneSuffix: payload.customerPhone.slice(-4),
+    hasImage: Boolean(payload.productImageUrl && !payload.productImageUrl.endsWith(".svg"))
+  });
+
   const env = getWhatsAppServerEnv();
   const customerPhone = formatWhatsAppPhone(payload.customerPhone);
   const adminPhone = formatWhatsAppPhone(env.WHATSAPP_ADMIN_NUMBER || "");
@@ -267,64 +572,65 @@ export async function sendOrderConfirmationWhatsApp(
     };
   }
 
-  const caption = buildOrderWhatsAppCaption(payload);
-  const appUrl = getAppUrl();
-  const imageUrl = payload.productImageUrl || `${appUrl}/placeholder-product.svg`;
+  const adminText = buildAdminOrderWhatsAppMessage({
+    customerName: payload.customerName,
+    phone: customerPhone,
+    orderNumber: payload.orderNumber,
+    productNames: payload.productNames,
+    totalAmount: payload.totalAmount,
+    orderStatus: payload.orderStatus,
+    paymentMethod: payload.paymentMethod,
+    paymentStatus: payload.paymentStatus
+  });
   let adminNotified = false;
+  let customerResponse: MetaWhatsAppResponse | null = null;
+  let adminResponse: MetaWhatsAppResponse | null = null;
 
+  const templateName = getOrderTemplateName();
   try {
-    await withWhatsAppRetries("order_confirmation.image", () =>
-      sendWhatsAppImageMessage({
+    const components = buildOrderTemplateComponents(payload);
+    customerResponse = await withWhatsAppRetries("order_confirmation.template", () =>
+      sendWhatsAppTemplateMessage({
         to: customerPhone,
-        caption,
-        imageUrl,
+        templateName,
+        bodyParameters: components.body,
         token: env.WHATSAPP_CLOUD_API_TOKEN,
         phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID
       })
     );
-  } catch (imageError) {
-    const imageMessage = toWhatsAppErrorMessage(imageError);
+  } catch (templateError) {
+    const message = toWhatsAppErrorMessage(templateError);
 
-    try {
-      await withWhatsAppRetries("order_confirmation.text_fallback", () =>
-        sendWhatsAppTextMessage({
-          to: customerPhone,
-          text: caption,
+    if (adminPhone) {
+      try {
+        adminResponse = await sendWhatsAppTextMessage({
+          to: adminPhone,
+          text: `${BRAND_NAME} WhatsApp failed for order ${payload.orderNumber}. Customer ***${customerPhone.slice(-4)}. Error: ${message}`,
           token: env.WHATSAPP_CLOUD_API_TOKEN,
           phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID
-        })
-      );
-    } catch (textError) {
-      const message = toWhatsAppErrorMessage(textError) || imageMessage;
-
-      if (adminPhone) {
-        try {
-          await sendWhatsAppTextMessage({
-            to: adminPhone,
-            text: `${BRAND_NAME} | Failed WhatsApp for order ${payload.orderNumber}. Customer ***${customerPhone.slice(-4)}. Error: ${message}`,
-            token: env.WHATSAPP_CLOUD_API_TOKEN,
-            phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID
-          });
-          adminNotified = true;
-        } catch {
-          adminNotified = false;
-        }
+        });
+        adminNotified = true;
+      } catch {
+        adminNotified = false;
       }
-
-      return {
-        sent: false,
-        provider: "whatsapp",
-        error: message,
-        adminNotified
-      };
     }
+
+    return {
+      sent: false,
+      provider: "whatsapp",
+      error: message,
+      adminNotified,
+      customerResponse,
+      adminResponse,
+      adminMessageId: extractMetaMessageId(adminResponse)
+    };
   }
 
   if (adminPhone) {
     try {
-      await sendWhatsAppTextMessage({
+      adminResponse = await sendWhatsAppTextMessage({
         to: adminPhone,
-        text: `${BRAND_NAME} | New order ${payload.orderNumber}. ${payload.customerName} (***${customerPhone.slice(-4)}). Total: ₹${payload.totalAmount}. Payment: ${payload.paymentMethod.toUpperCase()}.`,
+        text: adminText,
         token: env.WHATSAPP_CLOUD_API_TOKEN,
         phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID
       });
@@ -338,6 +644,14 @@ export async function sendOrderConfirmationWhatsApp(
     sent: true,
     provider: "whatsapp",
     error: null,
-    adminNotified
+    adminNotified,
+    customerMessageId: extractMetaMessageId(customerResponse),
+    adminMessageId: extractMetaMessageId(adminResponse),
+    customerResponse,
+    adminResponse
   };
+}
+
+function extractMetaMessageId(response: MetaWhatsAppResponse | null) {
+  return response?.messages?.[0]?.id;
 }

@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdminApi } from "@/lib/require-admin";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await requireAdminApi(request);
+  if (!auth.ok) return auth.response;
+
   const supabase = createAdminClient();
   try {
     const [{ count: totalOrders }, { data: orderRows }, { data: itemRows }] = await Promise.all([
@@ -27,6 +31,7 @@ export async function GET() {
 
     return NextResponse.json({ totalOrders: totalOrders ?? 0, revenue, topProducts });
   } catch (err) {
-    return NextResponse.json({ message: "failed", error: String(err) }, { status: 500 });
+    console.error("[analytics.summary]", err);
+    return NextResponse.json({ message: "Analytics temporarily unavailable." }, { status: 500 });
   }
 }

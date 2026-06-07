@@ -9,6 +9,7 @@ export type OrderWhatsAppTemplateInput = {
   orderStatus: string;
   paymentMethod: "cod" | "online";
   paymentStatus: string;
+  deliveryAddress?: string;
 };
 
 function formatInr(amount: number) {
@@ -21,9 +22,7 @@ function formatInr(amount: number) {
 
 function resolvePaymentLabel(paymentMethod: "cod" | "online", paymentStatus: string) {
   if (paymentMethod === "cod") return "Cash on Delivery (COD)";
-  const normalized = paymentStatus.toLowerCase();
-  if (normalized === "paid") return "Online — Paid";
-  return "Online";
+  return paymentStatus.toLowerCase() === "paid" ? "Online - Paid" : "Online";
 }
 
 function resolveStatusLabel(
@@ -31,43 +30,13 @@ function resolveStatusLabel(
   paymentStatus: string,
   orderStatus: string
 ) {
-  const normalizedPayment = paymentStatus.toLowerCase();
-  const normalizedOrder = orderStatus.toLowerCase();
-
-  if (paymentMethod === "online" && normalizedPayment === "paid") {
-    return "Confirmed";
+  if (paymentMethod === "online" && paymentStatus.toLowerCase() === "paid") {
+    return "Processing";
   }
 
-  if (paymentMethod === "cod") {
-    if (normalizedOrder.includes("confirm")) return "Confirmed";
-    return "Placed — Awaiting COD confirmation";
-  }
+  if (paymentMethod === "cod") return "Processing";
 
   return orderStatus || "Processing";
-}
-
-function resolveHeadline(paymentMethod: "cod" | "online", paymentStatus: string) {
-  if (paymentMethod === "online" && paymentStatus.toLowerCase() === "paid") {
-    return "✨ Your order has been confirmed successfully!";
-  }
-
-  if (paymentMethod === "cod") {
-    return "✨ Your COD order has been placed successfully!";
-  }
-
-  return "✨ Thank you for your order!";
-}
-
-function resolveDispatchLine(paymentMethod: "cod" | "online", paymentStatus: string) {
-  if (paymentMethod === "cod") {
-    return "We will confirm your COD order shortly, then prepare it for dispatch.";
-  }
-
-  if (paymentStatus.toLowerCase() === "paid") {
-    return "We're preparing your order for dispatch.";
-  }
-
-  return "We will update you once payment is confirmed.";
 }
 
 export function buildOrderTrackUrl(orderNumber: string) {
@@ -75,39 +44,51 @@ export function buildOrderTrackUrl(orderNumber: string) {
   return `${appUrl}/order/track/${encodeURIComponent(orderNumber)}`;
 }
 
-/** Premium luxury-style WhatsApp body (text + image caption). */
 export function buildPremiumOrderWhatsAppMessage(input: OrderWhatsAppTemplateInput) {
   const firstName = String(input.customerName ?? "there").trim().split(/\s+/)[0] || "there";
   const productLine =
-    input.productNames.length > 120
-      ? `${input.productNames.slice(0, 120)}...`
+    input.productNames.length > 140
+      ? `${input.productNames.slice(0, 140)}...`
       : input.productNames || `${BRAND_NAME} product`;
   const trackUrl = buildOrderTrackUrl(input.orderNumber);
+  const addressBlock = input.deliveryAddress ? `📍 Delivery Address: ${input.deliveryAddress}` : "";
 
   return [
-    resolveHeadline(input.paymentMethod, input.paymentStatus),
+    `🎉 Order Confirmed - ${BRAND_NAME}`,
     "",
     `Hi ${firstName},`,
-    `Thank you for shopping with ${BRAND_NAME}.`,
     "",
-    `🛍 Order ID: #${input.orderNumber}`,
+    `Your order #${input.orderNumber} has been confirmed successfully.`,
+    "",
+    `🛍 Items: ${productLine}`,
     `💳 Payment: ${resolvePaymentLabel(input.paymentMethod, input.paymentStatus)}`,
+    addressBlock,
     `📦 Status: ${resolveStatusLabel(input.paymentMethod, input.paymentStatus, input.orderStatus)}`,
+    "🚚 Delivery ETA: 3-5 Days",
     `💰 Total: ${formatInr(input.totalAmount)}`,
     "",
-    `🛒 Items: ${productLine}`,
-    "",
-    resolveDispatchLine(input.paymentMethod, input.paymentStatus),
+    `Thank you for shopping with ${BRAND_NAME}.`,
+    "Luxury delivered to your doorstep.",
     "",
     "Track your order:",
     trackUrl,
     "",
-    "Need help?",
-    "Reply to this message anytime."
+    "Need help? Reply to this message anytime."
+  ].filter(Boolean).join("\n");
+}
+
+export function buildAdminOrderWhatsAppMessage(input: OrderWhatsAppTemplateInput & { phone: string }) {
+  return [
+    "🚨 New Order Alert",
+    "",
+    `Customer: ${input.customerName}`,
+    `Phone: ${input.phone}`,
+    `Amount: ${formatInr(input.totalAmount)}`,
+    `Payment: ${resolvePaymentLabel(input.paymentMethod, input.paymentStatus)}`,
+    `Order: #${input.orderNumber}`
   ].join("\n");
 }
 
-/** @deprecated Use buildPremiumOrderWhatsAppMessage — kept for backward compatibility. */
 export function buildOrderWhatsAppCaption(
   payload: OrderWhatsAppTemplateInput & { deliveryAddress?: string }
 ) {

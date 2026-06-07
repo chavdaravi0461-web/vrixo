@@ -21,15 +21,19 @@ import { checkServerRateLimit } from "@/lib/rate-limit";
 import { createCheckoutToken, hasCheckoutTokenSecret } from "@/lib/checkout-token";
 import { badRequest, serverError, tooManyRequests } from "@/lib/api-response";
 import { publishEvent } from "@/lib/event-bus";
+import { fetchWithTimeout, safeJson } from "@/lib/request-timeout";
+import { sanitizeCustomerPhone } from "@/lib/whatsapp/phone";
+import { safeRoute } from "@/lib/safe-route";
 
 const createRazorpayOrderSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   couponCode: z.string().trim().max(64).optional().or(z.literal("")),
   shippingAddress: addressSchema,
-  items: secureCartItemsSchema
+  items: secureCartItemsSchema,
+  idempotencyKey: z.string().trim().max(128).optional()
 });
 
-export async function POST(request: Request) {
+export const POST = safeRoute(async function POST(request: Request) {
   const rateLimit = await checkServerRateLimit(request, { key: "razorpay-create", limit: 10, windowMs: 10 * 60 * 1000 });
   if (!rateLimit.allowed) return tooManyRequests(rateLimit.retryAfter);
 
@@ -101,6 +105,34 @@ export async function POST(request: Request) {
     );
   }
 
+  if (body.idempotencyKey) {
+    const existingCheckout = await findExistingOnlineCheckout(createAdminClient(), body.idempotencyKey);
+    if (existingCheckout) {
+      securityLog("razorpay.create_order.idempotent_replay", {
+        orderId: existingCheckout.orderId,
+        razorpayOrderId: existingCheckout.razorpayOrderId
+      });
+      return NextResponse.json({
+        success: true,
+        orderId: existingCheckout.orderId,
+        orderNumber: existingCheckout.orderNumber,
+        checkoutToken: createCheckoutToken(existingCheckout.orderId),
+        checkoutOrderNumber: existingCheckout.orderNumber,
+        razorpayOrderId: existingCheckout.razorpayOrderId,
+        amount: existingCheckout.amount,
+        currency: existingCheckout.currency,
+        receipt: existingCheckout.orderNumber,
+        keyId: RAZORPAY_PUBLIC_KEY_ID,
+        idempotentReplay: true,
+        customer: {
+          name: String(body.shippingAddress.fullName ?? ""),
+          email: body.email || checkoutUser.email || "",
+          contact: String(body.shippingAddress.phone ?? "")
+        }
+      });
+    }
+  }
+
   try {
     const { evaluatePaymentRisk, blockCustomer } = await import("@/services/fraud/fraud");
     const risk = await withTimeout(evaluatePaymentRisk({
@@ -125,7 +157,7 @@ export async function POST(request: Request) {
 
   try {
     securityLog("razorpay.create_order.started", { amount: expectedAmount, itemCount: body.items.length });
-    const response = await fetch("https://api.razorpay.com/v1/orders", {
+    const response = await fetchWithTimeout("https://api.razorpay.com/v1/orders", {
       method: "POST",
       headers: {
         Authorization: `Basic ${Buffer.from(
@@ -143,9 +175,10 @@ export async function POST(request: Request) {
           customerName: String(body.shippingAddress.fullName ?? ""),
           customerPhone: String(body.shippingAddress.phone ?? "")
         }
-      })
+      }),
+      timeoutMs: 2500
     });
-    payload = (await response.json()) as typeof payload;
+    payload = ((await safeJson<typeof payload>(response)) ?? {}) as typeof payload;
 
     if (!response.ok || !payload.id) {
       securityLog("razorpay.create_order.failed", { status: response.status });
@@ -169,7 +202,8 @@ export async function POST(request: Request) {
       shippingCharge,
       total,
       razorpayOrderId: payload.id,
-      razorpayReceipt: payload.receipt ?? orderNumber
+      razorpayReceipt: payload.receipt ?? orderNumber,
+      idempotencyKey: body.idempotencyKey
     });
 
     void publishEvent({
@@ -192,7 +226,7 @@ export async function POST(request: Request) {
       orderNumber: pendingOrder.orderNumber,
       checkoutToken: createCheckoutToken(pendingOrder.orderId),
       checkoutOrderNumber: orderNumber,
-      razorpayOrderId: payload.id,
+      razorpayOrderId: pendingOrder.razorpayOrderId,
       amount: payload.amount ?? expectedAmount,
       currency: payload.currency ?? "INR",
       receipt: payload.receipt ?? orderNumber,
@@ -209,6 +243,30 @@ export async function POST(request: Request) {
     });
     return serverError("Online payment order could not be started.");
   }
+});
+
+async function findExistingOnlineCheckout(
+  supabase: ReturnType<typeof createAdminClient>,
+  idempotencyKey: string
+) {
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, order_number, razorpay_order_id, total, payment_status")
+    .eq("idempotency_key", idempotencyKey)
+    .eq("payment_method", "online")
+    .maybeSingle();
+
+  if (!order?.id || !order.razorpay_order_id || String(order.payment_status).toLowerCase() === "paid") {
+    return null;
+  }
+
+  return {
+    orderId: order.id,
+    orderNumber: order.order_number,
+    razorpayOrderId: order.razorpay_order_id,
+    amount: Math.round(Number(order.total ?? 0) * 100),
+    currency: "INR"
+  };
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T) {
@@ -243,7 +301,8 @@ async function createPendingOnlineOrder({
   shippingCharge,
   total,
   razorpayOrderId,
-  razorpayReceipt
+  razorpayReceipt,
+  idempotencyKey
 }: {
   supabase: ReturnType<typeof createAdminClient>;
   userId: string;
@@ -257,14 +316,39 @@ async function createPendingOnlineOrder({
   total: number;
   razorpayOrderId: string;
   razorpayReceipt: string;
+  idempotencyKey?: string;
 }) {
   const orderId = crypto.randomUUID();
   const orderNumber = `DC-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${crypto
     .randomUUID()
     .slice(0, 6)
     .toUpperCase()}`;
-  const customerName = String(shippingAddress.fullName ?? "");
-  const customerPhone = String(shippingAddress.phone ?? "");
+  const customerName = String(shippingAddress.fullName ?? "").trim();
+  const customerPhone = sanitizeCustomerPhone(shippingAddress.phone);
+
+  if (!customerPhone) {
+    throw new Error("invalid_phone");
+  }
+
+  if (!customerName) {
+    throw new Error("missing_name");
+  }
+
+  if (idempotencyKey) {
+    const { data: existingOrder } = await supabase
+      .from("orders")
+      .select("id, order_number, razorpay_order_id")
+      .eq("idempotency_key", idempotencyKey)
+      .maybeSingle();
+
+    if (existingOrder?.id && existingOrder.razorpay_order_id) {
+      return {
+        orderId: existingOrder.id,
+        orderNumber: existingOrder.order_number,
+        razorpayOrderId: existingOrder.razorpay_order_id
+      };
+    }
+  }
 
   const { data: address, error: addressError } = await supabase
     .from("addresses")
@@ -309,10 +393,12 @@ async function createPendingOnlineOrder({
     customer_email: email,
     coupon_code: couponCode ? couponCode.toUpperCase() : null,
     whatsapp_status: "pending",
+    idempotency_key: idempotencyKey ?? null,
     notes: {
       email,
       razorpayOrderId,
-      razorpayReceipt
+      razorpayReceipt,
+      idempotencyKey
     }
   });
 
@@ -355,5 +441,5 @@ async function createPendingOnlineOrder({
     throw new Error("payment_insert_failed");
   }
 
-  return { orderId, orderNumber };
+  return { orderId, orderNumber, razorpayOrderId };
 }

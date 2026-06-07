@@ -5,12 +5,13 @@ import { buildOrderStatusView } from "@/lib/orders/order-status";
 import { decodeOrderNumberParam, isValidOrderNumber } from "@/lib/orders/order-numbers";
 import { checkServerRateLimit } from "@/lib/rate-limit";
 import { tooManyRequests } from "@/lib/api-response";
+import { safeRoute } from "@/lib/safe-route";
 
 type RouteContext = {
   params: Promise<{ orderNumber: string }>;
 };
 
-export async function GET(request: Request, context: RouteContext) {
+export const GET = safeRoute(async function GET(request: Request, context: RouteContext) {
   const rateLimit = await checkServerRateLimit(request, {
     key: "order-lookup",
     limit: 40,
@@ -75,4 +76,4 @@ export async function GET(request: Request, context: RouteContext) {
       statusView
     }
   });
-}
+});

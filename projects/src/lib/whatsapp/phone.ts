@@ -1,32 +1,58 @@
-/**
- * Formats Indian mobile numbers for WhatsApp Cloud API (digits only, country code 91).
- * Accepts: 9876543210, 09876543210, +91 98765 43210, 919876543210
- */
-export function formatWhatsAppPhone(value: string) {
+const INDIAN_PHONE_REGEX = /^[6-9]\d{9}$/;
+
+export function formatWhatsAppPhone(value: string): string {
   const digits = String(value ?? "").replace(/\D/g, "");
 
   if (digits.length === 10) {
-    return `91${digits}`;
+    if (!INDIAN_PHONE_REGEX.test(digits)) return "";
+    return `+91${digits}`;
   }
 
   if (digits.length === 11 && digits.startsWith("0")) {
-    return `91${digits.slice(1)}`;
+    const stripped = digits.slice(1);
+    if (!INDIAN_PHONE_REGEX.test(stripped)) return "";
+    return `+91${stripped}`;
   }
 
   if (digits.length === 12 && digits.startsWith("91")) {
-    return digits;
+    const stripped = digits.slice(2);
+    if (!INDIAN_PHONE_REGEX.test(stripped)) return "";
+    return `+91${stripped}`;
   }
+
+  const lastTen = digits.slice(-10);
+  if (INDIAN_PHONE_REGEX.test(lastTen)) return `+91${lastTen}`;
 
   return "";
 }
 
-/** Trims and strips unsafe characters from checkout phone input. */
-export function sanitizeCustomerPhone(value: unknown) {
+export function sanitizeCustomerPhone(value: unknown): string {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
-  return raw.replace(/[^\d+\s-]/g, "").slice(0, 20);
+  const digits = raw.replace(/\D/g, "");
+
+  if (digits.length === 10 && INDIAN_PHONE_REGEX.test(digits)) {
+    return digits;
+  }
+
+  if (digits.length > 10 && digits.startsWith("0")) {
+    const stripped = digits.slice(1);
+    if (stripped.length === 10 && INDIAN_PHONE_REGEX.test(stripped)) return stripped;
+  }
+
+  if (digits.length > 10 && digits.startsWith("91")) {
+    const stripped = digits.slice(2);
+    if (stripped.length === 10 && INDIAN_PHONE_REGEX.test(stripped)) return stripped;
+  }
+
+  const lastTen = digits.slice(-10);
+  return INDIAN_PHONE_REGEX.test(lastTen) ? lastTen : "";
 }
 
-export function isValidIndianWhatsAppPhone(value: string) {
-  return formatWhatsAppPhone(value).length === 12;
+export function isValidIndianWhatsAppPhone(value: string): boolean {
+  return formatWhatsAppPhone(value).length === 13;
+}
+
+export function toWhatsAppCloudRecipient(value: string): string {
+  return formatWhatsAppPhone(value).replace(/^\+/, "");
 }

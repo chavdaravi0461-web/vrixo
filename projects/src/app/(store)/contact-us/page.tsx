@@ -21,33 +21,33 @@ export default function ContactUsPage() {
   return (
     <section className="container mt-10">
       <div className="max-w-3xl">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-teal-700">Contact us</p>
-        <h1 className="mt-3 font-serif text-4xl font-semibold text-slate-950">Vrixo support</h1>
-        <p className="mt-3 text-base leading-7 text-slate-600">
+        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--dc-primary)]">Contact us</p>
+        <h1 className="mt-3 font-serif text-4xl font-semibold text-[var(--dc-heading)]">Vrixo support</h1>
+        <p className="mt-3 text-base leading-7 text-[var(--dc-muted)]">
           Reach out for order support, shipping updates, returns, refunds, cancellations, product details, or payment assistance.
         </p>
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="rounded-[2rem] bg-white p-6 card-shadow sm:p-8">
-          <h2 className="font-serif text-2xl font-semibold text-slate-950">Business details</h2>
+        <div className="rounded-[2rem] bg-[var(--dc-surface)] p-6 card-shadow sm:p-8">
+          <h2 className="font-serif text-2xl font-semibold text-[var(--dc-heading)]">Business details</h2>
           <div className="mt-6 grid gap-4">
             {contactItems.map((item) => (
-              <div key={item.label} className="flex gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-700">
+              <div key={item.label} className="flex gap-3 rounded-2xl border border-[var(--dc-border)] bg-[var(--dc-surface-soft)] p-4">
+                <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--dc-primary-light)] text-[var(--dc-primary)]">
                   <item.icon className="h-5 w-5" />
                 </span>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{item.label}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--dc-muted-2)]">{item.label}</p>
                   {item.href ? (
                     <a
                       href={item.href}
-                      className="mt-1 block break-words text-sm font-semibold text-slate-900 transition hover:text-teal-700"
+                      className="mt-1 block break-words text-sm font-semibold text-[var(--dc-heading)] transition hover:text-[var(--dc-primary)]"
                     >
                       {item.value}
                     </a>
                   ) : (
-                    <p className="mt-1 break-words text-sm font-semibold text-slate-900">{item.value}</p>
+                    <p className="mt-1 break-words text-sm font-semibold text-[var(--dc-heading)]">{item.value}</p>
                   )}
                 </div>
               </div>

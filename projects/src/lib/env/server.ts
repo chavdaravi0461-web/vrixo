@@ -24,15 +24,23 @@ const optionalServerSchema = z.object({
   WHATSAPP_ACCESS_TOKEN: z.string().optional().default(""),
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional().default(""),
   WHATSAPP_ADMIN_NUMBER: z.string().optional().default(""),
+  WHATSAPP_ORDER_TEMPLATE_NAME: z.string().optional().default("order_confirmation_vrixo"),
+  WHATSAPP_TEMPLATE_LANGUAGE: z.string().optional().default("en"),
+  WHATSAPP_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).optional().default("v23.0"),
   WHATSAPP_VERIFY_TOKEN: z.string().optional().default(""),
   WHATSAPP_WEBHOOK_SECRET: z.string().optional().default(""),
+  META_APP_SECRET: z.string().optional().default(""),
   NOTIFICATION_WORKER_SECRET: z.string().optional().default(""),
   RAZORPAY_KEY_ID: z.string().optional().default(""),
   RAZORPAY_KEY_SECRET: z.string().optional().default(""),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional().default(""),
   CHECKOUT_TOKEN_SECRET: z.string().optional().default(""),
   ADMIN_ACCESS_CODE: z.string().optional().default(""),
-  ADMIN_SESSION_SECRET: z.string().optional().default("")
+  ADMIN_SESSION_SECRET: z.string().optional().default(""),
+  REDIS_URL: z.string().optional().default(""),
+  VALKEY_URL: z.string().optional().default(""),
+  GROQ_API_KEY: z.string().optional().default(""),
+  OPENAI_API_KEY: z.string().optional().default("")
 });
 
 export function getOptionalServerEnv() {
@@ -51,15 +59,24 @@ export function getOptionalServerEnv() {
     WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN,
     WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID,
     WHATSAPP_ADMIN_NUMBER: process.env.WHATSAPP_ADMIN_NUMBER,
+    WHATSAPP_ORDER_TEMPLATE_NAME:
+      process.env.WHATSAPP_ORDER_TEMPLATE_NAME || "order_confirmation_vrixo",
+    WHATSAPP_TEMPLATE_LANGUAGE: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en",
+    WHATSAPP_GRAPH_API_VERSION: process.env.WHATSAPP_GRAPH_API_VERSION || "v23.0",
     WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN,
     WHATSAPP_WEBHOOK_SECRET: process.env.WHATSAPP_WEBHOOK_SECRET,
+    META_APP_SECRET: process.env.META_APP_SECRET,
     NOTIFICATION_WORKER_SECRET: process.env.NOTIFICATION_WORKER_SECRET,
     RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
     RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET,
     CHECKOUT_TOKEN_SECRET: process.env.CHECKOUT_TOKEN_SECRET,
     ADMIN_ACCESS_CODE: process.env.ADMIN_ACCESS_CODE,
-    ADMIN_SESSION_SECRET: process.env.ADMIN_SESSION_SECRET
+    ADMIN_SESSION_SECRET: process.env.ADMIN_SESSION_SECRET,
+    REDIS_URL: process.env.REDIS_URL,
+    VALKEY_URL: process.env.VALKEY_URL,
+    GROQ_API_KEY: process.env.GROQ_API_KEY,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY
   });
 }
 

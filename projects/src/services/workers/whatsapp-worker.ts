@@ -1,4 +1,5 @@
 import { createWorker } from "@/lib/queue";
+import { isRedisAvailable } from "@/lib/redis";
 import {
   sendWhatsAppDocumentMessage,
   getWhatsAppServerEnv,
@@ -6,9 +7,11 @@ import {
   sendOrderConfirmationWhatsApp
 } from "@/lib/whatsapp";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { connectMongo, WhatsAppAttempt } from "@/lib/mongo/models";
 import { generateAIResponse } from "@/lib/ai/provider";
 import { dispatchOrderConfirmationWhatsApp } from "@/services/notifications/order-whatsapp";
+import { logInfo, logError } from "@/lib/observability";
+import { saveWhatsAppLog } from "@/services/notifications/whatsapp-log-store";
+import type { Job } from "bullmq";
 
 type JobPayload = {
   orderId: string;
@@ -28,16 +31,19 @@ type JobPayload = {
   checkoutLink?: string;
 };
 
-async function processJob(job: { name?: string; data: JobPayload }) {
+async function processJob(job: Job<JobPayload> | { name?: string; id?: string; attemptsMade?: number; data: JobPayload }) {
   const name = job.name || "";
   const payload = job.data;
   const supabase = createAdminClient();
+  const attempt = Number(job.attemptsMade ?? 0) + 1;
 
-  try {
-    await connectMongo();
-  } catch (err) {
-    console.warn("[whatsapp-worker] could not connect to mongo for logging", err);
-  }
+  logInfo("whatsapp_worker.job_started", {
+    jobName: name,
+    jobId: job.id,
+    attempt,
+    orderId: payload.orderId,
+    orderNumber: payload.orderNumber
+  });
 
   try {
     if (name === "send-invoice") {
@@ -62,7 +68,16 @@ async function processJob(job: { name?: string; data: JobPayload }) {
       });
 
       await supabase.from("orders").update({ invoice_url: url }).eq("id", payload.orderId);
-      await WhatsAppAttempt.create({ orderId: payload.orderId, attempt: 1, status: "sent", response: { invoiceUrl: url } });
+      await saveWhatsAppLog({
+        orderId: payload.orderId,
+        orderNumber: payload.orderNumber,
+        jobId: job.id,
+        channel: "invoice",
+        attempt,
+        status: "sent",
+        response: { invoiceUrl: url }
+      });
+      logInfo("whatsapp_worker.invoice_sent", { orderId: payload.orderId });
       return { sent: true };
     }
 
@@ -71,7 +86,7 @@ async function processJob(job: { name?: string; data: JobPayload }) {
       const message =
         (await generateAIResponse(prompt)) || "Your cart is waiting. Tap to complete checkout now.";
 
-      await sendOrderConfirmationWhatsApp({
+      const abandonedResult = await sendOrderConfirmationWhatsApp({
         customerName: payload.customerName,
         customerPhone: payload.customerPhone,
         orderNumber: payload.orderNumber ?? "",
@@ -85,14 +100,26 @@ async function processJob(job: { name?: string; data: JobPayload }) {
         deliveryAddress: payload.deliveryAddress || ""
       });
 
-      await WhatsAppAttempt.create({ orderId: payload.orderId ?? "", attempt: 1, status: "sent", response: { message } });
+      await saveWhatsAppLog({
+        orderId: payload.orderId ?? "",
+        orderNumber: payload.orderNumber,
+        jobId: job.id,
+        channel: "abandoned_cart",
+        attempt,
+        status: abandonedResult.sent ? "sent" : "failed",
+        messageId: abandonedResult.customerMessageId,
+        adminMessageId: abandonedResult.adminMessageId,
+        error: abandonedResult.error ?? undefined,
+        response: { message, result: abandonedResult }
+      });
+      logInfo("whatsapp_worker.abandoned_cart_sent", { orderId: payload.orderId });
       return { sent: true };
     }
 
     const paymentMethod = payload.paymentMethod ?? inferPaymentMethod(payload.orderStatus);
     const paymentStatus = payload.paymentStatus ?? inferPaymentStatus(payload.orderStatus);
 
-    return dispatchOrderConfirmationWhatsApp({
+    const result = await dispatchOrderConfirmationWhatsApp({
       orderId: payload.orderId,
       customerName: payload.customerName,
       customerPhone: payload.customerPhone,
@@ -105,26 +132,38 @@ async function processJob(job: { name?: string; data: JobPayload }) {
       paymentStatus,
       productImageUrl: payload.productImageUrl ?? "",
       deliveryAddress: payload.deliveryAddress ?? ""
+    }, {
+      jobId: job.id,
+      attempt
     });
+
+    if (!result.sent && !result.skipped) {
+      throw new Error(result.error || "WhatsApp delivery failed.");
+    }
+
+    return result;
   } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    logError("whatsapp_worker.job_failed", {
+      orderId: payload.orderId,
+      jobName: name,
+      error: errorMessage
+    });
+
     await supabase
       .from("orders")
-      .update({
-        whatsapp_status: "failed",
-        whatsapp_error: err instanceof Error ? err.message : String(err)
-      })
+      .update({ whatsapp_status: "failed", whatsapp_error: errorMessage, last_error: errorMessage })
       .eq("id", payload.orderId);
 
-    try {
-      await WhatsAppAttempt.create({
-        orderId: payload.orderId ?? "",
-        attempt: 0,
-        status: "error",
-        error: err instanceof Error ? err.message : String(err)
-      });
-    } catch {
-      // non-blocking
-    }
+    await saveWhatsAppLog({
+      orderId: payload.orderId ?? "",
+      orderNumber: payload.orderNumber,
+      jobId: job.id,
+      channel: name || "order_confirmation",
+      attempt,
+      status: "error",
+      error: errorMessage
+    });
 
     throw err;
   }
@@ -143,4 +182,28 @@ function inferPaymentStatus(orderStatus: string) {
   return "pending";
 }
 
-createWorker("whatsapp-jobs", async (job) => processJob(job as { name?: string; data: JobPayload }));
+let workerInitialized = false;
+
+export function startWhatsAppWorker() {
+  if (workerInitialized) {
+    logInfo("whatsapp_worker.already_initialized");
+    return;
+  }
+  if (!isRedisAvailable()) {
+    logInfo("whatsapp_worker.skipped", { reason: "redis_unavailable" });
+    return;
+  }
+  workerInitialized = true;
+  logInfo("whatsapp_worker.starting");
+  createWorker<JobPayload>("whatsapp-jobs", async (job) => processJob(job));
+}
+
+const shouldStartWorker =
+  process.env.START_WORKER === "true" ||
+  (process.env.NODE_ENV === "production" && process.env.VERCEL_ENV !== undefined);
+
+if (shouldStartWorker && isRedisAvailable()) {
+  startWhatsAppWorker();
+} else if (shouldStartWorker) {
+  logInfo("whatsapp_worker.skipped_at_startup", { reason: "redis_unavailable" });
+}

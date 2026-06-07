@@ -1,36 +1,74 @@
+import crypto from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { sendOrderConfirmationSms } from "@/lib/sms";
 import { sendOrderConfirmationWhatsApp } from "@/lib/whatsapp";
+import { formatWhatsAppPhone } from "@/lib/whatsapp/phone";
 
 export type NotificationProvider = "sms" | "whatsapp";
 export type NotificationEventType = "order_confirmation" | "delivery_update" | "admin_alert";
 
-export type NotificationPayload = {
-  customerName: string;
-  customerPhone: string;
-  orderNumber: string;
-  productNames: string;
-  totalQty: number;
-  totalAmount: number;
-  orderStatus: string;
-  deliveryAddress?: string;
-  productImageUrl?: string;
-};
+const notificationPayloadSchema = z.object({
+  customerName: z.string().trim().min(1).max(160),
+  customerPhone: z.string().trim().min(8).max(32),
+  orderNumber: z.string().trim().min(1).max(80),
+  productNames: z.string().trim().min(1).max(1024),
+  totalQty: z.coerce.number().int().nonnegative(),
+  totalAmount: z.coerce.number().nonnegative(),
+  orderStatus: z.string().trim().min(1).max(64),
+  paymentMethod: z.enum(["cod", "online"]),
+  paymentStatus: z.string().trim().min(1).max(64),
+  deliveryAddress: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
+  productImageUrl: z.string().trim().max(2048).optional()
+});
+
+export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 
 export type NotificationResult = {
   sent: boolean;
   error: string | null;
   attempts: number;
   adminNotified?: boolean;
+  providerMessageId?: string;
+  response?: unknown;
 };
 
-const MAX_NOTIFICATION_ATTEMPTS = 5;
-const BASE_RETRY_MINUTES = 10;
+type ClaimedNotification = {
+  id: string;
+  order_id: string;
+  provider: NotificationProvider;
+  event_type: NotificationEventType;
+  attempts: number;
+  max_attempts: number;
+  payload: unknown;
+};
 
-export function calculateNextRetry(attempt: number) {
-  const delayMinutes = BASE_RETRY_MINUTES * Math.pow(2, Math.max(0, attempt - 1));
-  const jitterMinutes = Math.floor(Math.random() * 5);
-  return new Date(Date.now() + (delayMinutes + jitterMinutes) * 60 * 1000).toISOString();
+const MAX_NOTIFICATION_ATTEMPTS = 8;
+const BASE_RETRY_SECONDS = 30;
+const MAX_RETRY_SECONDS = 60 * 60;
+
+export function calculateNextRetry(attempt: number, now = Date.now()) {
+  const exponentialSeconds = Math.min(
+    MAX_RETRY_SECONDS,
+    BASE_RETRY_SECONDS * 2 ** Math.max(0, attempt - 1)
+  );
+  const jitterSeconds = Math.floor(Math.random() * Math.max(1, exponentialSeconds * 0.2));
+  return new Date(now + (exponentialSeconds + jitterSeconds) * 1000).toISOString();
+}
+
+export async function enqueueOrderConfirmationNotification(
+  supabase: SupabaseClient,
+  orderId: string
+) {
+  const { data, error } = await supabase.rpc("enqueue_order_confirmation_whatsapp", {
+    p_order_id: orderId
+  });
+
+  if (error) {
+    throw new Error(`Failed to enqueue WhatsApp confirmation: ${error.message}`);
+  }
+
+  return data ? String(data) : null;
 }
 
 export async function createOrderNotification(
@@ -40,76 +78,105 @@ export async function createOrderNotification(
   eventType: NotificationEventType,
   payload: NotificationPayload
 ) {
-  const insert = await supabase.from("order_notifications").insert({
-    order_id: orderId,
-    provider,
-    event_type: eventType,
-    payload,
-    max_attempts: MAX_NOTIFICATION_ATTEMPTS
-  }).select("id").single();
+  const validatedPayload = notificationPayloadSchema.parse(payload);
+  const dedupeKey = `${provider}:${eventType}:${orderId}`;
+  const { data, error } = await supabase
+    .from("order_notifications")
+    .upsert({
+      order_id: orderId,
+      provider,
+      event_type: eventType,
+      dedupe_key: dedupeKey,
+      payload: validatedPayload,
+      max_attempts: MAX_NOTIFICATION_ATTEMPTS
+    }, {
+      onConflict: "dedupe_key"
+    })
+    .select("id")
+    .single();
 
-  if (insert.error || !insert.data?.id) {
-    throw new Error("Failed to create notification queue entry.");
+  if (error || !data?.id) {
+    throw new Error(`Failed to create notification queue entry: ${error?.message ?? "unknown"}`);
   }
 
-  return insert.data.id as string;
-}
-
-async function recordNotificationAttempt(
-  supabase: SupabaseClient,
-  notificationId: string,
-  provider: NotificationProvider,
-  eventType: NotificationEventType,
-  attempt: number,
-  status: "sent" | "failed" | "retry_scheduled",
-  error: string | null,
-  response: unknown
-) {
-  await supabase.from("order_notification_attempts").insert({
-    notification_id: notificationId,
-    provider,
-    event_type: eventType,
-    attempt,
-    status,
-    error,
-    response: response ? response : null
-  });
-}
-
-async function updateNotificationStatus(
-  supabase: SupabaseClient,
-  notificationId: string,
-  updates: Record<string, unknown>
-) {
-  await supabase
-    .from("order_notifications")
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq("id", notificationId);
+  return String(data.id);
 }
 
 export async function dispatchOrderNotification(
   supabase: SupabaseClient,
   notificationId: string
 ): Promise<NotificationResult> {
-  const { data: notification, error } = await supabase
-    .from("order_notifications")
-    .select("id, order_id, provider, event_type, attempts, max_attempts, payload")
-    .eq("id", notificationId)
-    .single();
+  const workerId = buildWorkerId();
+  const { data, error } = await supabase.rpc("claim_order_notification", {
+    p_notification_id: notificationId,
+    p_worker_id: workerId,
+    p_lease_seconds: 120
+  });
 
-  if (error || !notification) {
-    throw new Error("Notification queue entry not found.");
+  if (error) {
+    throw new Error(`Failed to claim notification: ${error.message}`);
   }
 
-  const payload = notification.payload as NotificationPayload;
-  const attempt = Number(notification.attempts ?? 0) + 1;
-  let result: NotificationResult = {
-    sent: false,
-    error: "Notification dispatch failed.",
-    attempts: attempt,
-    adminNotified: false
-  };
+  const notification = normalizeRpcRow(data);
+  if (!notification) {
+    return {
+      sent: false,
+      error: "Notification is not claimable.",
+      attempts: 0
+    };
+  }
 
+  return dispatchClaimedNotification(supabase, notification);
+}
+
+export async function processPendingNotifications(
+  supabase: SupabaseClient,
+  limit = 20
+) {
+  const workerId = buildWorkerId();
+  const { data, error } = await supabase.rpc("claim_order_notifications", {
+    p_limit: Math.min(Math.max(limit, 1), 100),
+    p_worker_id: workerId,
+    p_lease_seconds: 120
+  });
+
+  if (error) {
+    throw new Error(`Failed to claim pending notifications: ${error.message}`);
+  }
+
+  const notifications = normalizeRpcRows(data);
+  return Promise.all(
+    notifications.map(async (notification) => ({
+      notificationId: notification.id,
+      result: await dispatchClaimedNotification(supabase, notification)
+    }))
+  );
+}
+
+async function dispatchClaimedNotification(
+  supabase: SupabaseClient,
+  notification: ClaimedNotification
+): Promise<NotificationResult> {
+  const parsedPayload = notificationPayloadSchema.safeParse(notification.payload);
+  if (!parsedPayload.success) {
+    const error = parsedPayload.error.issues.map((issue) => issue.message).join(" ");
+    return completeNotification(supabase, notification, {
+      sent: false,
+      error: `Invalid notification payload: ${error}`,
+      attempts: notification.attempts
+    }, "invalid_payload");
+  }
+
+  const payload = parsedPayload.data;
+  if (!formatWhatsAppPhone(payload.customerPhone) && notification.provider === "whatsapp") {
+    return completeNotification(supabase, notification, {
+      sent: false,
+      error: "Invalid customer WhatsApp number.",
+      attempts: notification.attempts
+    }, "invalid_phone");
+  }
+
+  let result: NotificationResult;
   try {
     if (notification.provider === "sms") {
       const smsResult = await sendOrderConfirmationSms({
@@ -121,114 +188,108 @@ export async function dispatchOrderNotification(
         totalAmount: payload.totalAmount,
         orderStatus: payload.orderStatus
       });
-
       result = {
         sent: smsResult.sent,
         error: smsResult.error,
-        attempts: attempt
+        attempts: notification.attempts,
+        response: smsResult
       };
     } else {
       const whatsappResult = await sendOrderConfirmationWhatsApp({
-        customerName: payload.customerName,
-        customerPhone: payload.customerPhone,
-        orderNumber: payload.orderNumber,
-        productNames: payload.productNames,
-        totalQty: payload.totalQty,
-        totalAmount: payload.totalAmount,
-        orderStatus: payload.orderStatus,
-        paymentMethod: inferPaymentMethod(payload.orderStatus),
-        paymentStatus: inferPaymentStatus(payload.orderStatus),
-        productImageUrl: payload.productImageUrl ?? "",
-        deliveryAddress: payload.deliveryAddress ?? ""
+        ...payload,
+        deliveryAddress: formatDeliveryAddress(payload.deliveryAddress),
+        productImageUrl: payload.productImageUrl ?? ""
       });
-
       result = {
         sent: whatsappResult.sent,
         error: whatsappResult.error,
-        attempts: attempt,
-        adminNotified: whatsappResult.adminNotified
+        attempts: notification.attempts,
+        adminNotified: whatsappResult.adminNotified,
+        providerMessageId: whatsappResult.customerMessageId,
+        response: whatsappResult.customerResponse
       };
     }
-  } catch (dispatchError) {
+  } catch (error) {
     result = {
       sent: false,
-      error: dispatchError instanceof Error ? dispatchError.message : String(dispatchError),
-      attempts: attempt
+      error: error instanceof Error ? error.message : String(error),
+      attempts: notification.attempts
     };
   }
 
-  const status = result.sent ? "sent" : attempt >= Number(notification.max_attempts ?? MAX_NOTIFICATION_ATTEMPTS) ? "failed" : "retry_scheduled";
-  const nextRetryAt = result.sent ? null : status === "failed" ? null : calculateNextRetry(attempt);
+  return completeNotification(supabase, notification, result);
+}
 
-  await recordNotificationAttempt(
-    supabase,
-    notificationId,
-    notification.provider,
-    notification.event_type as NotificationEventType,
-    attempt,
-    status,
-    result.error,
-    result
-  );
+async function completeNotification(
+  supabase: SupabaseClient,
+  notification: ClaimedNotification,
+  result: NotificationResult,
+  errorCode?: string
+) {
+  const nextRetryAt = result.sent ? null : calculateNextRetry(notification.attempts);
+  const { error } = await supabase.rpc("complete_order_notification", {
+    p_notification_id: notification.id,
+    p_sent: result.sent,
+    p_provider_message_id: result.providerMessageId ?? null,
+    p_error: result.error,
+    p_error_code: errorCode ?? null,
+    p_response: result.response ?? null,
+    p_next_retry_at: nextRetryAt
+  });
 
-  await updateNotificationStatus(supabase, notificationId, {
-    attempts: attempt,
-    status,
-    last_error: result.error,
-    next_retry_at: nextRetryAt,
-    sent_at: result.sent ? new Date().toISOString() : null
+  if (error) {
+    throw new Error(`Failed to persist notification result: ${error.message}`);
+  }
+
+  await supabase.from("order_notification_attempts").insert({
+    notification_id: notification.id,
+    provider: notification.provider,
+    event_type: notification.event_type,
+    attempt: notification.attempts,
+    status: result.sent
+      ? "sent"
+      : notification.attempts >= notification.max_attempts
+        ? "failed"
+        : "retry_scheduled",
+    error: result.error,
+    response: result.response ?? null
   });
 
   return result;
 }
 
-export async function processPendingNotifications(
-  supabase: SupabaseClient,
-  limit = 20
-) {
-  const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from("order_notifications")
-    .select("id")
-    .in("status", ["pending", "retry_scheduled"])
-    .or(`next_retry_at.is.null,next_retry_at.lte.${now}`)
-    .limit(limit);
-
-  if (error) {
-    throw error;
-  }
-
-  const notificationIds = (data ?? []).map((item) => String(item.id));
-  const results: Array<{ notificationId: string; result: NotificationResult }> = [];
-
-  for (const id of notificationIds) {
-    try {
-      const result = await dispatchOrderNotification(supabase, id);
-      results.push({ notificationId: id, result });
-    } catch (dispatchError) {
-      results.push({
-        notificationId: id,
-        result: {
-          sent: false,
-          error: dispatchError instanceof Error ? dispatchError.message : String(dispatchError),
-          attempts: 0
-        }
-      });
-    }
-  }
-
-  return results;
+function normalizeRpcRows(value: unknown): ClaimedNotification[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(normalizeRpcRow).filter((row): row is ClaimedNotification => Boolean(row));
 }
 
-function inferPaymentMethod(orderStatus: string): "cod" | "online" {
-  const normalized = orderStatus.toLowerCase();
-  if (normalized.includes("cod") || normalized === "pending") return "cod";
-  return "online";
+function normalizeRpcRow(value: unknown): ClaimedNotification | null {
+  const row = Array.isArray(value) ? value[0] : value;
+  if (!row || typeof row !== "object") return null;
+  const record = row as Record<string, unknown>;
+  if (!record.id || !record.order_id || !record.provider || !record.event_type) return null;
+  return {
+    id: String(record.id),
+    order_id: String(record.order_id),
+    provider: String(record.provider) as NotificationProvider,
+    event_type: String(record.event_type) as NotificationEventType,
+    attempts: Number(record.attempts ?? 0),
+    max_attempts: Number(record.max_attempts ?? MAX_NOTIFICATION_ATTEMPTS),
+    payload: record.payload
+  };
 }
 
-function inferPaymentStatus(orderStatus: string) {
-  const normalized = orderStatus.toLowerCase();
-  if (normalized.includes("confirm") || normalized === "paid") return "paid";
-  if (normalized.includes("cod")) return "cod_pending";
-  return "pending";
+function buildWorkerId() {
+  return `${process.env.VERCEL_REGION || process.env.HOSTNAME || "worker"}:${crypto.randomUUID()}`;
+}
+
+function formatDeliveryAddress(value: NotificationPayload["deliveryAddress"]) {
+  if (!value) return "Delivery address saved with your order";
+  if (typeof value === "string") return value.trim() || "Delivery address saved with your order";
+  return (
+    [value.line1, value.line2, value.city, value.state, value.postalCode, value.country]
+      .map((part) => (part ? String(part).trim() : ""))
+      .filter(Boolean)
+      .join(", ") || "Delivery address saved with your order"
+  );
 }
