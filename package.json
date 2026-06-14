@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "dev": "cd projects && npm run dev",
+    "build": "cd projects && npm run build",
+    "start": "cd projects && npm run start",
+    "lint": "cd projects && npm run lint",
+    "typecheck": "cd projects && npm run typecheck"
+  }
+}

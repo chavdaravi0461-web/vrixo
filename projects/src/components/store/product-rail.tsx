@@ -28,36 +28,26 @@ export function ProductRail({
   if (!products.length) return null;
 
   return (
-    <section className="dc-section-tight anim-fade-up">
-      <div className="dc-container">
+    <section className="section anim-fade-up" style={{ padding: "60px 0" }}>
+      <div className="container">
         <div className="mb-6 flex items-end justify-between">
           <div className="flex items-center gap-3">
             {badge && (
-              <span className="dc-badge-luxe">{badge}</span>
+              <span className="mono" style={{ padding: "3px 10px", border: "1px solid var(--border)", borderRadius: "4px", color: "var(--text-muted)" }}>{badge}</span>
             )}
             {title && (
-              <h2 className="dc-heading-md !text-[22px]">{title}</h2>
+              <h2 className="display-md" style={{ margin: 0 }}>{title}</h2>
             )}
           </div>
           <div className="hidden items-center gap-1 md:flex">
-            <button
-              type="button"
-              onClick={() => scroll("left")}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(255,255,255,0.08)] text-[var(--dc-muted)] transition hover:border-[rgba(255,255,255,0.2)] hover:text-[var(--dc-heading)]"
-              aria-label="Scroll left"
-            >
+            <button type="button" onClick={() => scroll("left")} className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)] transition hover:border-[rgba(255,255,255,.12)] hover:text-[var(--text)]" aria-label="Scroll left">
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <button
-              type="button"
-              onClick={() => scroll("right")}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(255,255,255,0.08)] text-[var(--dc-muted)] transition hover:border-[rgba(255,255,255,0.2)] hover:text-[var(--dc-heading)]"
-              aria-label="Scroll right"
-            >
+            <button type="button" onClick={() => scroll("right")} className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)] transition hover:border-[rgba(255,255,255,.12)] hover:text-[var(--text)]" aria-label="Scroll right">
               <ChevronRight className="h-4 w-4" />
             </button>
             {link && (
-              <Link href={link} className="ml-2 flex items-center gap-1 text-xs font-medium text-[var(--dc-muted)] hover:text-[var(--dc-heading)] transition-colors">
+              <Link href={link} className="ml-2 flex items-center gap-1 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
                 View all <ArrowRight className="h-3 w-3" />
               </Link>
             )}
@@ -65,20 +55,17 @@ export function ProductRail({
         </div>
       </div>
       <div className="relative">
-        <div
-          ref={rail}
-          className="flex gap-3 overflow-x-auto px-[max(20px,calc((100vw-var(--dc-max))/2))] pb-2 scrollbar-none"
-        >
+        <div ref={rail} className="rail" style={{ paddingBottom: "8px" }}>
           {products.map((p) => (
-            <div key={p.id} className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px]">
+            <div key={p.id} className="rail-item">
               <ProductCardRail product={p} />
             </div>
           ))}
         </div>
       </div>
-      <div className="dc-container mt-3 md:hidden">
+      <div className="container mt-3 md:hidden">
         {link && (
-          <Link href={link} className="flex items-center gap-1 text-xs font-medium text-[var(--dc-muted)] hover:text-[var(--dc-heading)]">
+          <Link href={link} className="flex items-center gap-1 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)]">
             View all <ArrowRight className="h-3 w-3" />
           </Link>
         )}

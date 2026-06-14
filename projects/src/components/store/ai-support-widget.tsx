@@ -42,15 +42,20 @@ const messageVariants = {
   },
 };
 
+function escapeHtml(str: string) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
 function formatMd(text: string) {
-  let processed = text
+  const escaped = escapeHtml(text);
+  let processed = escaped
     .replace(/━━━/g, "<br/>")
     .replace(/━━/g, "")
     .replace(/```(\w*)\n?([\s\S]*?)```/g, "<code>$2</code>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     .replace(/`(.+?)`/g, "<code class='dc-inline-code'>$1</code>")
-    .replace(/•/g, "•")
+    .replace(/•/g, "&#8226;")
     .replace(/\n/g, "<br/>");
   return processed;
 }

@@ -23,6 +23,7 @@ export function HomeContent({
   bestSellers: Product[];
   newArrivals: Product[];
 }) {
+  const heroProducts = useMemo(() => allProducts.filter((p) => p.highlighted), [allProducts]);
   const watches = useMemo(() => allProducts.filter((p) => p.category?.toLowerCase() === "watches"), [allProducts]);
 
   const recentSlugs = useRecentlyViewedStore((s) => s.slugs);
@@ -33,111 +34,78 @@ export function HomeContent({
 
   return (
     <div>
-      <HeroSlider products={allProducts} />
+      <HeroSlider products={heroProducts.length > 0 ? heroProducts : allProducts} />
 
-      <section className="dc-section-tight">
-        <div className="dc-container">
-          <div className="dc-stats-row anim-stagger-grid">
-            {[
-              { number: "15K+", label: "Happy Customers" },
-              { number: "100+", label: "Premium Styles" },
-              { number: "7 Days", label: "Easy Returns" },
-              { number: "Free", label: "Shipping All India" },
-            ].map((s) => (
-              <div key={s.label} className="dc-stat-item anim-fade-up">
-                <div className="dc-stat-number">{s.number}</div>
-                <div className="dc-stat-label">{s.label}</div>
-              </div>
-            ))}
+      <section className="section">
+        <div className="container">
+          <div className="section-header anim-fade-up">
+            <span className="section-eyebrow">Selection</span>
+            <h2 className="section-title">Best Sellers</h2>
           </div>
+        </div>
+        <ProductRail title="" products={bestSellers.length >= 8 ? bestSellers : allProducts.slice(0, 10)} />
+        <div className="container mt-10 text-center anim-fade-up">
+          <Link href="/shop?sort=popularity" className="hero-btn hero-btn-ghost inline-flex">
+            View all best sellers <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 
-      <section className="dc-section-story">
-        <div className="dc-container">
-          <div className="dc-story-layout">
-            <div className="dc-story-media anim-fade-up">
-              <div className="w-full h-full bg-[var(--dc-surface)] flex items-center justify-center">
-                {bestSellers[0] && (
-                  <img
-                    src={bestSellers[0].images?.[0] || "/placeholder.svg"}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                )}
-              </div>
-              <div className="dc-story-media-accent" />
+      {featured.length >= 4 && (
+        <section className="section" style={{ paddingTop: 0 }}>
+          <div className="container">
+            <div className="section-header anim-fade-up">
+              <span className="section-eyebrow">Editors&apos; pick</span>
+              <h2 className="section-title">Featured Collection</h2>
+              <p className="section-subtitle">Handpicked premium pieces selected by our curation team.</p>
             </div>
-            <div className="dc-story-content anim-fade-up">
-              <span className="dc-eyebrow">Curated for you</span>
-              <h2 className="dc-heading-lg">
-                Every detail<br />speaks luxury
-              </h2>
-              <p className="dc-body-lg">
-                From premium materials to precision craftsmanship — each piece is selected 
-                for those who refuse to compromise on style.
-              </p>
-              <div>
-                <Link href="/shop" className="dc-btn-luxe dc-btn-luxe-ghost inline-flex">
-                  Explore the collection <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            </div>
+          </div>
+          <ProductGrid products={featured.slice(0, 8)} />
+          <div className="container mt-10 text-center anim-fade-up">
+            <Link href="/shop?sort=popularity" className="hero-btn hero-btn-ghost inline-flex">
+              View all featured <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </section>
+      )}
+
+      <section className="section" style={{ paddingTop: 0 }}>
+        <div className="container">
+          <div className="section-header anim-fade-up">
+            <span className="section-eyebrow">Curated for you</span>
+            <h2 className="section-title">Every detail speaks luxury</h2>
+            <p className="section-subtitle">
+              From premium materials to precision craftsmanship — each piece is selected for those who refuse to compromise on style.
+            </p>
+          </div>
+          <div className="text-center anim-fade-up">
+            <Link href="/shop" className="hero-btn hero-btn-ghost inline-flex">
+              Explore the collection <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </section>
 
       <CategoryShowcase products={allProducts} />
 
-      <section className="dc-section-cinematic">
-        <div className="dc-container">
-          <div className="mb-12 anim-fade-up">
-            <span className="dc-eyebrow">Selection</span>
-            <h2 className="dc-heading-lg">Best Sellers</h2>
-          </div>
-        </div>
-        <ProductRail title="" products={bestSellers.length >= 8 ? bestSellers : allProducts.slice(0, 10)} />
-        <div className="dc-container mt-10 text-center">
-          <Link href="/shop?sort=popularity" className="dc-btn-luxe dc-btn-luxe-ghost inline-flex">
-            View all best sellers <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-      </section>
-
       <BrandGrid products={allProducts} />
 
       {newArrivals.length >= 4 && (
-        <section className="dc-section-story">
-          <div className="dc-container">
-            <div className="dc-story-layout reversed">
-              <div className="dc-story-media anim-fade-up">
-                <div className="w-full h-full bg-[var(--dc-surface)] flex items-center justify-center">
-                  {newArrivals[0] && (
-                    <img
-                      src={newArrivals[0].images?.[0] || "/placeholder.svg"}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                </div>
-                <div className="dc-story-media-accent" />
-              </div>
-              <div className="dc-story-content anim-fade-up">
-                <span className="dc-eyebrow">Fresh drops</span>
-                <h2 className="dc-heading-lg">
-                  New arrivals<br />every week
-                </h2>
-                <p className="dc-body-lg">
-                  Stay ahead of the curve with our latest additions. Updated weekly with the 
-                  most sought-after styles.
-                </p>
-                <div>
-                  <Link href="/shop?sort=newest" className="dc-btn-luxe dc-btn-luxe-ghost inline-flex">
-                    View new arrivals <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
-                </div>
-              </div>
+        <section className="section">
+          <div className="container">
+            <div className="section-header anim-fade-up">
+              <span className="section-eyebrow">Fresh drops</span>
+              <h2 className="section-title">New arrivals every week</h2>
+              <p className="section-subtitle">
+                Stay ahead of the curve with our latest additions. Updated weekly with the most sought-after styles.
+              </p>
             </div>
+          </div>
+          <ProductGrid products={newArrivals.slice(0, 8)} />
+          <div className="container mt-10 text-center anim-fade-up">
+            <Link href="/shop?sort=newest" className="hero-btn hero-btn-ghost inline-flex">
+              View new arrivals <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </section>
       )}
@@ -148,18 +116,16 @@ export function HomeContent({
         <ProductRail title="Premium Watches" badge="Collection" link="/category/watches" products={watches.slice(0, 10)} />
       ) : null}
 
-      <section className="dc-section-tight">
-        <div className="dc-container">
-          <div className="dc-testimonial anim-fade-up">
-            <blockquote>
+      <section className="section" style={{ padding: "60px 0" }}>
+        <div className="container">
+          <div className="section-header anim-fade-up">
+            <blockquote className="display-md" style={{ fontStyle: "italic", fontWeight: 400, maxWidth: "600px", margin: "0 auto", color: "var(--text-secondary)" }}>
               &ldquo;I was just browsing and ended up buying two pairs. The quality exceeded my expectations.&rdquo;
             </blockquote>
-            <footer>— Verified Customer, Mumbai</footer>
+            <footer className="body-sm" style={{ marginTop: "12px" }}>— Verified Customer, Mumbai</footer>
           </div>
         </div>
       </section>
-
-      <hr className="dc-divider-luxe" />
 
       <Newsletter />
     </div>

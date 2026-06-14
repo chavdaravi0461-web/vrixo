@@ -65,7 +65,7 @@ export default async function AdminProductsPage({
   const total = count ?? 0;
 
   return (
-    <AdminShell current="/dashboard-admin-vrixo-ravi/products">
+    <AdminShell>
       <ProductAdminClient
         products={(data ?? []).map(mapAdminProduct)}
         pagination={{ page, limit, total }}

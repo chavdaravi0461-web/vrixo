@@ -4,8 +4,12 @@ import { ADMIN_COOKIE_NAME, expiredAdminCookieOptions } from "@/lib/admin-auth";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route";
 import { isSupabaseConfigured } from "@/lib/utils";
 import { safeRoute } from "@/lib/safe-route";
+import { requireSameOrigin } from "@/lib/server/origin-check";
+import { forbidden } from "@/lib/api-response";
 
 export const POST = safeRoute(async function POST(request: NextRequest) {
+  const originCheck = requireSameOrigin(request);
+  if (originCheck) return forbidden();
   const response = NextResponse.json({
     success: true
   });

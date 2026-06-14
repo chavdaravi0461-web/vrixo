@@ -26,8 +26,8 @@ const contentSecurityPolicy = [
   "base-uri 'self'",
   "frame-ancestors 'self'",
   "object-src 'none'",
-  "form-action 'self'",
-  "img-src 'self' data: blob: https: *.supabase.co images.unsplash.com images.pexels.com",
+  "form-action 'self' https://accounts.google.com https://accounts.youtube.com",
+  "img-src 'self' data: blob: https: *.supabase.co images.unsplash.com images.pexels.com https://lh3.googleusercontent.com *.googleusercontent.com",
   "font-src 'self' data:",
   `style-src 'self' 'unsafe-inline'`,
   `script-src ${scriptSrc}`,
@@ -56,7 +56,7 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
-    qualities: [70, 75, 78, 82],
+    qualities: [70, 75, 78, 82, 85],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
     // Extended device sizes for responsive images
     deviceSizes: [360, 414, 640, 768, 1024, 1280, 1536],

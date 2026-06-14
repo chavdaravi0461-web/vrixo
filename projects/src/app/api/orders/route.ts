@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/nextauth";
 import { hasClientSupabaseEnv } from "@/lib/env/client";
 import { hasServerSupabaseAdminEnv } from "@/lib/env/server";
 import { createPublicSupabaseClient } from "@/lib/supabase/public";
@@ -77,18 +79,24 @@ export async function POST(request: Request) {
       return jsonError("Checkout is temporarily unavailable.", 500, "ENV_MISSING", requestId);
     }
 
-    const authSupabase = await createServerSupabaseClient();
-    const authResult = await withTimeout(
-      authSupabase.auth.getUser(),
-      1500,
-      "Supabase auth lookup timed out."
-    ).catch((error) => {
-      console.warn("[checkout.cod] auth_lookup_failed", JSON.stringify({ requestId, error: toErrorMessage(error) }));
-      return null;
-    });
+    const nextAuthSession = await getServerSession(authOptions);
+    let userId = nextAuthSession?.user?.id || null;
 
-    const user = authResult?.data?.user ?? null;
-    if (!user) {
+    if (!userId) {
+      const authSupabase = await createServerSupabaseClient();
+      const authResult = await withTimeout(
+        authSupabase.auth.getUser(),
+        1500,
+        "Supabase auth lookup timed out."
+      ).catch((error) => {
+        console.warn("[checkout.cod] auth_lookup_failed", JSON.stringify({ requestId, error: toErrorMessage(error) }));
+        return null;
+      });
+      const supabaseUser = authResult?.data?.user ?? null;
+      if (supabaseUser) userId = supabaseUser.id;
+    }
+
+    if (!userId) {
       return jsonError("Please login or create an account before placing an order.", 401, "AUTH_REQUIRED", requestId);
     }
 
@@ -114,12 +122,14 @@ export async function POST(request: Request) {
       });
     }
 
+    const customerEmail = body.email || nextAuthSession?.user?.email || "";
+
     const cart = await getSafeCartSnapshot(body.items, requestId);
     const discount = await getSafeDiscount({
       supabase: adminSupabase,
       couponCode: body.couponCode,
       subtotal: cart.subtotal,
-      userId: user.id,
+      userId,
       requestId
     });
     const shippingSettings = await withTimeout(getShippingSettings(), 500, "Shipping settings timed out.")
@@ -132,8 +142,8 @@ export async function POST(request: Request) {
 
     const order = await insertCodOrder({
       supabase: adminSupabase,
-      userId: user.id,
-      email: body.email || user.email || "",
+      userId,
+      email: customerEmail,
       customerName,
       customerPhone,
       shippingAddress: body.shippingAddress,
@@ -150,8 +160,8 @@ export async function POST(request: Request) {
     void runSecondaryOrderWrites({
       supabase: adminSupabase,
       orderId: order.order_id,
-      userId: user.id,
-      email: body.email || user.email || "",
+      userId,
+      email: customerEmail,
       customerName,
       customerPhone,
       shippingAddress: body.shippingAddress,
@@ -164,10 +174,10 @@ export async function POST(request: Request) {
       await runPostOrderTasks({
         orderId: order.order_id,
         orderNumber: order.order_number,
-        userId: user.id,
+        userId,
         customerName,
         customerPhone,
-        customerEmail: body.email || user.email || "",
+        customerEmail,
         couponCode: body.couponCode,
         orderStatus: "pending",
         paymentMethod: "cod",

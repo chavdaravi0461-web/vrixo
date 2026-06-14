@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
+import { Heart, Menu, Search, ShoppingBag, User, X, Sparkles } from "lucide-react";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/lib/store/cart-store";
 import { useWishlistStore } from "@/lib/store/wishlist-store";
+import dynamic from "next/dynamic";
+
+const CartPanel = dynamic(() => import("./cart-panel").then((m) => ({ default: m.CartPanel })), { ssr: false });
+const SearchOverlay = dynamic(() => import("./search-overlay").then((m) => ({ default: m.SearchOverlay })), { ssr: false });
 
 const menuItems = [
   {
@@ -67,6 +71,8 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileSub, setMobileSub] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const params = useSearchParams();
@@ -83,8 +89,15 @@ export function Header() {
   }, []);
 
   useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setSearchOpen(true); } };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  useEffect(() => {
     setMenuOpen(false);
     setMobileSub(null);
+    setSearchOpen(false);
   }, [pathname]);
 
   const handleSearch = useCallback((e: React.FormEvent<HTMLFormElement>) => {
@@ -99,111 +112,91 @@ export function Header() {
 
   return (
     <>
-      <header className={`dc-header-luxe ${scrolled ? "scrolled" : ""}`}>
-        <div className="dc-header-luxe-inner">
-          <Link href="/home" className="dc-header-luxe-logo" aria-label="Vrixo">
+      <header className={`header ${scrolled ? "scrolled" : ""}`}>
+        <div className="header-inner">
+          <Link href="/home" className="header-logo" aria-label="Vrixo">
             Vrixo
           </Link>
 
-          <nav className="dc-header-luxe-nav max-[1024px]:hidden">
-            <Link href="/home" className={cn(pathname === "/home" && "active")}>Home</Link>
+          <nav className="header-nav max-[1024px]:hidden">
+            <Link href="/home" className={cn("header-nav-item", pathname === "/home" && "!text-[var(--text)]")}>Home</Link>
             {menuItems.map((item) =>
               item.columns.length > 0 ? (
-                <div key={item.label} className="nav-item-luxe relative">
-                  <span className="nav-trigger">{item.label}</span>
-                  <div className="dc-mega-luxe">
-                    {item.columns.map((col) => (
-                      <div key={col.title} className="dc-mega-luxe-col">
-                        <h3>{col.title}</h3>
-                        {col.links.map((link) => (
-                          <Link key={link.label} href={link.href}>{link.label}</Link>
-                        ))}
-                      </div>
-                    ))}
+                <div key={item.label} className="relative">
+                  <span className="header-nav-item">{item.label}</span>
+                  <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                    <div className="glass-strong rounded-[var(--radius)] p-4 min-w-[200px]">
+                      {item.columns.map((col) => (
+                        <div key={col.title} className="mb-3 last:mb-0">
+                          <p className="eyebrow mb-2 px-2">{col.title}</p>
+                          {col.links.map((link) => (
+                            <Link key={link.label} href={link.href} className="block px-2 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors rounded-[4px] hover:bg-[var(--glass-hover)]">
+                              {link.label}
+                            </Link>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ) : (
-                <Link key={item.label} href={item.href}>{item.label}</Link>
+                <Link key={item.label} href={item.href} className="header-nav-item">{item.label}</Link>
               )
             )}
           </nav>
 
-          <div className="dc-header-luxe-actions">
-            <button
-              type="button"
-              aria-label="Search"
-              className="dc-header-luxe-action max-[1024px]:hidden"
-              onClick={() => {
-                const input = document.querySelector<HTMLInputElement>(".dc-header-luxe-search-input");
-                input?.focus();
-              }}
-            >
-              <Search />
+          <div className="header-actions">
+            <button type="button" aria-label="Search" className="header-icon max-[1024px]:hidden" onClick={() => setSearchOpen(true)}>
+              <Search className="h-[18px] w-[18px]" />
             </button>
-            <Link href="/wishlist" className="dc-header-luxe-action" aria-label="Wishlist">
-              <Heart />
+            <Link href="/wishlist" className="header-icon" aria-label="Wishlist">
+              <Heart className="h-[18px] w-[18px]" />
               {hydrated && wishlist.length > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-[var(--dc-heading)] text-[7px] font-bold text-[var(--dc-bg)]">
-                  {wishlist.length}
-                </span>
+                <span className="header-badge">{wishlist.length}</span>
               )}
             </Link>
-            <Link href="/account" className="dc-header-luxe-action max-[640px]:hidden" aria-label="Account">
-              <User />
+            <Link href="/account" className="header-icon max-[640px]:hidden" aria-label="Account">
+              <User className="h-[18px] w-[18px]" />
             </Link>
-            <Link href="/cart" className="dc-header-luxe-action" aria-label="Cart">
-              <ShoppingBag />
+            <button type="button" className="header-icon" aria-label="Cart" onClick={() => setCartOpen(true)}>
+              <ShoppingBag className="h-[18px] w-[18px]" />
               {hydrated && count > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-[var(--dc-heading)] text-[7px] font-bold text-[var(--dc-bg)]">
-                  {count > 9 ? "9+" : count}
-                </span>
+                <span className="header-badge">{count > 9 ? "9+" : count}</span>
               )}
-            </Link>
-            <button
-              type="button"
-              aria-label="Menu"
-              className="dc-header-luxe-action !hidden max-[1024px]:!flex"
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              {menuOpen ? <X /> : <Menu />}
+            </button>
+            <button type="button" aria-label="AI" className="header-icon max-[1024px]:hidden">
+              <Sparkles className="h-[18px] w-[18px]" />
+            </button>
+            <button type="button" aria-label="Menu" className="header-icon !hidden max-[1024px]:!flex" onClick={() => setMenuOpen((v) => !v)}>
+              {menuOpen ? <X className="h-[18px] w-[18px]" /> : <Menu className="h-[18px] w-[18px]" />}
             </button>
           </div>
         </div>
       </header>
 
-      <div className="h-[68px]" />
+      <div className="h-[64px]" />
 
       {menuOpen && (
-        <div
-          className="fixed inset-0 top-[68px] z-[99] bg-[var(--dc-bg)] overflow-y-auto anim-fade-in"
-          style={{ paddingBottom: "calc(80px + env(safe-area-inset-bottom))" }}
-        >
+        <div className="fixed inset-0 top-[64px] z-[99] bg-[var(--bg)] overflow-y-auto anim-fade-in" style={{ paddingBottom: "calc(80px + env(safe-area-inset-bottom))" }}>
           <div className="px-6 pt-6 pb-4">
             <form onSubmit={handleSearch}>
-              <div className="flex items-center gap-3 border-b border-[rgba(255,255,255,0.06)] pb-3">
-                <Search className="h-4 w-4 shrink-0 text-[var(--dc-muted-2)]" />
-                <input
-                  name="q"
-                  placeholder="Search products..."
-                  className="flex-1 bg-transparent text-sm text-[var(--dc-heading)] outline-none placeholder:text-[var(--dc-muted-2)]"
-                  autoComplete="off"
-                />
+              <div className="flex items-center gap-3 border-b border-[var(--border)] pb-3">
+                <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                <input name="q" placeholder="Search products..." className="search-input flex-1 bg-transparent text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)]" autoComplete="off" />
               </div>
             </form>
           </div>
           <nav className="px-6">
             <MobileMenuItem href="/home" label="Home" />
             {menuItems.map((item) => (
-              <MobileMenuGroup
-                key={item.label}
-                item={item}
-                open={mobileSub === item.label}
-                onToggle={() => setMobileSub(mobileSub === item.label ? null : item.label)}
-              />
+              <MobileMenuGroup key={item.label} item={item} open={mobileSub === item.label} onToggle={() => setMobileSub(mobileSub === item.label ? null : item.label)} />
             ))}
           </nav>
         </div>
       )}
+
+      <CartPanel open={cartOpen} onClose={() => setCartOpen(false)} />
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   );
 }
@@ -211,13 +204,7 @@ export function Header() {
 function MobileMenuItem({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
   return (
-    <Link
-      href={href}
-      className={cn(
-        "block py-3 text-sm font-medium transition-colors",
-        pathname === href ? "text-[var(--dc-heading)]" : "text-[var(--dc-muted)] hover:text-[var(--dc-heading)]"
-      )}
-    >
+    <Link href={href} className={cn("block py-3 text-sm font-medium transition-colors", pathname === href ? "text-[var(--text)]" : "text-[var(--text-secondary)] hover:text-[var(--text)]")}>
       {label}
     </Link>
   );
@@ -227,53 +214,26 @@ function MobileMenuGroup({ item, open, onToggle }: { item: typeof menuItems[0]; 
   if (item.columns.length === 0) {
     return <MobileMenuItem href={item.href} label={item.label} />;
   }
-
   return (
     <div>
-      <button
-        onClick={onToggle}
-        className="flex w-full items-center justify-between py-3 text-sm font-medium text-[var(--dc-muted)]"
-      >
+      <button onClick={onToggle} className="flex w-full items-center justify-between py-3 text-sm font-medium text-[var(--text-secondary)]">
         {item.label}
-        <svg
-          className={`chevron transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
-        >
+        <svg className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
-      <div
-        className={`overflow-hidden transition-all duration-200 ease-out ${open ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
-      >
+      <div className={`overflow-hidden transition-all duration-200 ease-out ${open ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}>
         <div className="pb-3 pl-4">
           {item.columns.map((col) => (
             <div key={col.title} className="mb-4">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[var(--dc-muted-2)]">
-                {col.title}
-              </p>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{col.title}</p>
               {col.links.map((link) => (
-                <Link
-                  key={link.label}
-                  href={link.href}
-                  className="block py-1.5 text-sm text-[var(--dc-muted)] hover:text-[var(--dc-heading)] transition-colors"
-                >
-                  {link.label}
-                </Link>
+                <Link key={link.label} href={link.href} className="block py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors">{link.label}</Link>
               ))}
             </div>
           ))}
         </div>
       </div>
-    </div>
-  );
-}
-
-export function AnnouncementBar() {
-  return (
-    <div className="hidden">
-      <span>Easy Return</span>
-      <span>Free Shipping All Over India</span>
-      <span>Secure Payment</span>
     </div>
   );
 }

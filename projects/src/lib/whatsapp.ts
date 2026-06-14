@@ -14,6 +14,7 @@ import {
 import { fetchWithTimeout, safeJson } from "@/lib/request-timeout";
 import { withProtection } from "@/lib/dependency-protection";
 import { isShuttingDown } from "@/lib/graceful-shutdown";
+import { logInfo, logWarn, logError } from "@/lib/observability";
 
 export { formatWhatsAppPhone } from "@/lib/whatsapp/phone";
 export {
@@ -193,6 +194,9 @@ export async function sendWhatsAppTextMessage({
   token: string;
   phoneNumberId: string;
 }) {
+  const toSuffix = toWhatsAppCloudRecipient(to).slice(-4);
+  whatsappLog("info", "send_text.started", { toSuffix, textLength: text.length });
+
   const response = await circuitProtectedFetch(getMessagesEndpoint(phoneNumberId), {
     method: "POST",
     headers: {
@@ -217,6 +221,12 @@ export async function sendWhatsAppTextMessage({
       type: payload?.error?.type,
       fbtrace_id: payload?.error?.fbtrace_id
     });
+    logError("whatsapp.send_text.failed", {
+      toSuffix,
+      status: response.status,
+      error: errorMsg,
+      code: payload?.error?.code
+    });
     throw new WhatsAppDispatchError(
       errorMsg,
       "whatsapp_text_failed",
@@ -224,13 +234,9 @@ export async function sendWhatsAppTextMessage({
     );
   }
 
-  console.log("[TRACE] MESSAGE_SENT", {
-    provider: "whatsapp_cloud_api",
-    type: "text",
-    status: response.status,
-    toSuffix: toWhatsAppCloudRecipient(to).slice(-4),
-    messageId: payload?.messages?.[0]?.id ?? null,
-  });
+  const messageId = payload?.messages?.[0]?.id ?? null;
+  logInfo("whatsapp.send_text.sent", { toSuffix, status: response.status, messageId });
+  whatsappLog("info", "send_text.sent", { toSuffix, status: response.status, messageId });
 
   return payload;
 }
@@ -599,31 +605,70 @@ export async function sendOrderConfirmationWhatsApp(
       })
     );
   } catch (templateError) {
-    const message = toWhatsAppErrorMessage(templateError);
+    const templateErrMsg = toWhatsAppErrorMessage(templateError);
+    logWarn("whatsapp.order_confirmation.template_fallback", {
+      orderNumber: payload.orderNumber,
+      error: templateErrMsg,
+      phoneSuffix: customerPhone.slice(-4)
+    });
 
-    if (adminPhone) {
-      try {
-        adminResponse = await sendWhatsAppTextMessage({
-          to: adminPhone,
-          text: `${BRAND_NAME} WhatsApp failed for order ${payload.orderNumber}. Customer ***${customerPhone.slice(-4)}. Error: ${message}`,
+    const customerText = buildPremiumOrderWhatsAppMessage({
+      customerName: payload.customerName,
+      orderNumber: payload.orderNumber,
+      productNames: payload.productNames,
+      totalAmount: payload.totalAmount,
+      orderStatus: payload.orderStatus,
+      paymentMethod: payload.paymentMethod,
+      paymentStatus: payload.paymentStatus,
+      deliveryAddress: payload.deliveryAddress
+    });
+
+    try {
+      customerResponse = await withWhatsAppRetries("order_confirmation.text_fallback", () =>
+        sendWhatsAppTextMessage({
+          to: customerPhone,
+          text: customerText,
           token: env.WHATSAPP_CLOUD_API_TOKEN,
           phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID
-        });
-        adminNotified = true;
-      } catch {
-        adminNotified = false;
-      }
-    }
+        })
+      );
+      logInfo("whatsapp.order_confirmation.text_fallback_sent", {
+        orderNumber: payload.orderNumber,
+        phoneSuffix: customerPhone.slice(-4)
+      });
+    } catch (textError) {
+      const message = toWhatsAppErrorMessage(textError);
+      logError("whatsapp.order_confirmation.all_failed", {
+        orderNumber: payload.orderNumber,
+        templateError: templateErrMsg,
+        textError: message,
+        phoneSuffix: customerPhone.slice(-4)
+      });
 
-    return {
-      sent: false,
-      provider: "whatsapp",
-      error: message,
-      adminNotified,
-      customerResponse,
-      adminResponse,
-      adminMessageId: extractMetaMessageId(adminResponse)
-    };
+      if (adminPhone) {
+        try {
+          adminResponse = await sendWhatsAppTextMessage({
+            to: adminPhone,
+            text: `${BRAND_NAME} WhatsApp failed for order ${payload.orderNumber}. Customer ***${customerPhone.slice(-4)}. Template: ${templateErrMsg}. Text: ${message}`,
+            token: env.WHATSAPP_CLOUD_API_TOKEN,
+            phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID
+          });
+          adminNotified = true;
+        } catch {
+          adminNotified = false;
+        }
+      }
+
+      return {
+        sent: false,
+        provider: "whatsapp",
+        error: message,
+        adminNotified,
+        customerResponse,
+        adminResponse,
+        adminMessageId: extractMetaMessageId(adminResponse)
+      };
+    }
   }
 
   if (adminPhone) {

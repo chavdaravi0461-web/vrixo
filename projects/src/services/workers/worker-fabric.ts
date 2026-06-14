@@ -291,3 +291,25 @@ workerFabric.registerCron({
   maxRetries: 3,
   timeoutMs: 30_000,
 });
+
+async function processNotificationOutbox(): Promise<{ processed: number; failed: number }> {
+  try {
+    const { processPendingNotifications } = await import("@/lib/notification-queue");
+    const supabase = createAdminClient();
+    const results = await processPendingNotifications(supabase, 25);
+    const sent = results.filter((r) => r.result.sent).length;
+    const failed = results.filter((r) => !r.result.sent).length;
+    return { processed: results.length, failed };
+  } catch {
+    return { processed: 0, failed: 1 };
+  }
+}
+
+workerFabric.registerCron({
+  name: "notification-outbox",
+  schedule: "30s",
+  description: "Processes pending WhatsApp/SMS notifications from the outbox",
+  handler: processNotificationOutbox,
+  maxRetries: 2,
+  timeoutMs: 60_000,
+});

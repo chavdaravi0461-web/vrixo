@@ -108,7 +108,6 @@ export const PATCH = safeRoute(async function PATCH(
   }
 
   const updatePayload = { ...payload };
-  delete (updatePayload as Partial<typeof payload>).highlighted;
   const { error } = await supabase.from("products").update(updatePayload).eq("id", id);
 
   if (error) {

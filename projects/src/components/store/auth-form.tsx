@@ -183,6 +183,14 @@ export function AuthForm({
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
+          {mode === "login" && (
+            <Link
+              href="/forgot-password"
+              className="mt-2 block text-right text-xs font-medium text-teal-700 hover:underline"
+            >
+              Forgot password?
+            </Link>
+          )}
         </Field>
       </div>
       <Button type="submit" className="mt-6 w-full" disabled={isSubmitting || !configured}>

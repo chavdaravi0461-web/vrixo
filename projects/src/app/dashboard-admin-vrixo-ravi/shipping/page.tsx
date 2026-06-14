@@ -12,7 +12,7 @@ export default async function AdminShippingPage() {
   const settings = await getShippingSettings();
 
   return (
-    <AdminShell current="/dashboard-admin-vrixo-ravi/shipping">
+    <AdminShell>
       <ShippingSettingsClient settings={settings} />
     </AdminShell>
   );

@@ -28,7 +28,7 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
   const hasHydrated = useCartStore((state) => state.hasHydrated);
   const subtotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
   const shipping = calculateShippingCharge(subtotal, items, shippingSettings);
-  const total = subtotal + shipping - discount;
+  const total = Math.max(0, subtotal + shipping - discount);
   const debounce = useDebounce(250);
 
   if (!hasHydrated) {
@@ -36,81 +36,69 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
   }
 
   return (
-    <div className="dc-cart-layout grid gap-4 lg:grid-cols-[1fr_380px]">
-      <div className="space-y-4">
+    <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+      <div className="space-y-3">
         {items.map((item) => (
           <div
             key={`${item.productId}-${item.selectedSize ?? "nosize"}-${item.selectedColor ?? "nocolor"}`}
-            className="dc-cart-item dc-glass rounded-[var(--dc-radius-lg)] p-4"
+            className="glass-card"
+            style={{ padding: "16px" }}
           >
             <div className="flex flex-col gap-4 md:flex-row">
-              <div className="relative h-36 w-full overflow-hidden rounded-[var(--dc-radius-md)] bg-[var(--dc-surface)] md:w-36">
+              <div className="relative h-32 w-full overflow-hidden rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] md:w-32">
                 <Image
                   src={normalizeProductImage(item.image) ?? getFallbackProductImage()}
                   alt={cleanProductTitle(item.title)}
                   fill
                   sizes="(min-width: 768px) 128px, 100vw"
-                  className="object-contain p-3"
+                  className="object-contain p-2"
                 />
               </div>
               <div className="flex-1">
                 <div className="flex flex-col justify-between gap-4 md:flex-row">
                   <div>
-                    <Link href={`/product/${item.slug}`} className="text-lg font-black text-[var(--dc-heading)] hover:text-white">
+                    <Link href={`/product/${item.slug}`} className="p-card-title hover:text-[var(--accent)]">
                       {cleanProductTitle(item.title)}
                     </Link>
-                    <div className="mt-2 flex flex-wrap gap-3 text-sm text-[var(--dc-muted)]">
+                    <div className="flex flex-wrap gap-3 text-sm" style={{ marginTop: "8px", color: "var(--text-muted)" }}>
                       {item.selectedSize ? <span>Size {item.selectedSize}</span> : null}
                       {item.selectedColor ? <span>{item.selectedColor}</span> : null}
                     </div>
-                    <p className="mt-3 text-lg font-black text-[var(--dc-heading)]">
+                    <p className="p-card-price" style={{ marginTop: "12px" }}>
                       {formatCurrency(item.price)}
                     </p>
                   </div>
                   <button
                     type="button"
-                    className="inline-flex items-center gap-2 self-start text-sm font-bold text-[var(--dc-danger)]"
-                    onClick={() =>
-                      removeItem(item.productId, item.selectedSize, item.selectedColor)
-                    }
+                    className="inline-flex items-center gap-2 self-start text-sm font-medium"
+                    style={{ color: "var(--text-muted)" }}
+                    onClick={() => removeItem(item.productId, item.selectedSize, item.selectedColor)}
                   >
                     <Trash2 className="h-4 w-4" />
                     Remove
                   </button>
                 </div>
-                <div className="mt-6 inline-flex items-center rounded-full border border-[var(--dc-border)] bg-[var(--dc-surface)] p-1">
+                <div className="inline-flex items-center" style={{ marginTop: "16px", border: "1px solid var(--border)", borderRadius: "999px", padding: "2px" }}>
                   <button
                     type="button"
-                    className="rounded-full p-2 transition hover:bg-white"
-                    onClick={() =>
-                      debounce(() =>
-                        updateQuantity(
-                          item.productId,
-                          item.quantity - 1,
-                          item.selectedSize,
-                          item.selectedColor
-                        )
-                      )
-                    }
+                    className="rounded-full p-1.5 transition hover:bg-[var(--glass-hover)]"
+                    style={{ color: "var(--text-secondary)" }}
+                    onClick={() => {
+                      if (item.quantity <= 1) removeItem(item.productId, item.selectedSize, item.selectedColor);
+                      else debounce(() => updateQuantity(item.productId, item.quantity - 1, item.selectedSize, item.selectedColor));
+                    }}
                   >
-                    <Minus className="h-4 w-4" />
+                    <Minus className="h-3.5 w-3.5" />
                   </button>
-                  <span className="min-w-10 text-center text-sm font-semibold">{item.quantity}</span>
+                  <span className="min-w-8 text-center text-sm font-medium">{item.quantity}</span>
                   <button
                     type="button"
-                    className="rounded-full p-2 transition hover:bg-white"
-                    onClick={() =>
-                      debounce(() =>
-                        updateQuantity(
-                          item.productId,
-                          item.quantity + 1,
-                          item.selectedSize,
-                          item.selectedColor
-                        )
-                      )
-                    }
+                    className="rounded-full p-1.5 transition hover:bg-[var(--glass-hover)]"
+                    disabled={item.stock ? item.quantity >= item.stock : false}
+                    style={{ color: "var(--text-secondary)" }}
+                    onClick={() => debounce(() => updateQuantity(item.productId, item.quantity + 1, item.selectedSize, item.selectedColor))}
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
@@ -118,9 +106,9 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
           </div>
         ))}
       </div>
-      <div className="dc-cart-summary dc-glass rounded-[var(--dc-radius-lg)] p-5 lg:sticky lg:top-32 lg:self-start">
-        <h2 className="text-lg font-black uppercase tracking-[0.14em] text-[var(--dc-heading)]">Order Summary</h2>
-        <div className="mt-6 space-y-4 text-sm text-[var(--dc-muted)]">
+      <div className="glass-card" style={{ padding: "24px", position: "sticky", top: "96px", alignSelf: "start", height: "fit-content" }}>
+        <h2 className="display-md" style={{ fontSize: "18px", letterSpacing: "-.015em", marginBottom: "20px" }}>Order Summary</h2>
+        <div className="body-sm" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           <div className="flex items-center justify-between">
             <span>Subtotal</span>
             <span>{formatCurrency(subtotal)}</span>
@@ -133,25 +121,24 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
             <span>Shipping</span>
             <span>{shipping === 0 ? "Free" : formatCurrency(shipping)}</span>
           </div>
-          <div className="border-t border-[var(--dc-border)] pt-4">
-            <div className="flex items-center justify-between text-lg font-black text-[var(--dc-heading)]">
+          <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
+            <div className="flex items-center justify-between" style={{ fontSize: "16px", fontWeight: 600, letterSpacing: "-.01em" }}>
               <span>Total</span>
               <span>{formatCurrency(total)}</span>
             </div>
           </div>
         </div>
-        <Link href="/checkout" className="mt-6 block">
-          <Button className="h-12 w-full" disabled={items.length === 0}>
+        <Link href="/checkout" style={{ display: "block", marginTop: "24px" }}>
+          <Button className="h-11 w-full" disabled={items.length === 0}>
             Proceed to checkout
           </Button>
         </Link>
         {items.length > 0 ? <CouponBox subtotal={subtotal} /> : null}
-        <p className="mt-4 rounded-[var(--dc-radius-md)] border border-[#f3d7a0] bg-[var(--dc-surface)] p-4 text-xs leading-6 text-[var(--dc-muted)]">
+        <div style={{ marginTop: "16px", padding: "12px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border)", fontSize: "12px", color: "var(--text-muted)", lineHeight: 1.6 }}>
           {shippingSettings.mode === "free"
             ? "Free shipping is active on every order."
-            : `Shipping charge is ${formatCurrency(shippingSettings.shippingCharge)}.`} Cash on Delivery
-          is available by default.
-        </p>
+            : `Shipping charge is ${formatCurrency(shippingSettings.shippingCharge)}.`} Cash on Delivery is available by default.
+        </div>
       </div>
     </div>
   );
@@ -159,26 +146,26 @@ export function CartView({ shippingSettings }: { shippingSettings: ShippingSetti
 
 function CartViewSkeleton() {
   return (
-    <div className="dc-cart-layout grid gap-4 lg:grid-cols-[1fr_380px]" aria-label="Loading cart">
-      <div className="space-y-4">
+    <div className="grid gap-4 lg:grid-cols-[1fr_360px]" aria-label="Loading cart">
+      <div className="space-y-3">
         {[0, 1].map((item) => (
-          <div key={item} className="dc-glass rounded-[var(--dc-radius-lg)] p-4">
+          <div key={item} className="glass-card" style={{ padding: "16px" }}>
             <div className="flex flex-col gap-4 md:flex-row">
-              <div className="h-36 w-full animate-pulse rounded-[var(--dc-radius-md)] bg-[var(--dc-surface)] md:w-36" />
+              <div className="h-32 w-full animate-pulse rounded-[var(--radius-sm)] bg-[var(--bg-secondary)] md:w-32" />
               <div className="flex-1 space-y-3">
-                <div className="h-5 w-2/3 animate-pulse rounded-full bg-[var(--dc-surface)]" />
-                <div className="h-4 w-1/2 animate-pulse rounded-full bg-[var(--dc-surface)]" />
-                <div className="h-5 w-24 animate-pulse rounded-full bg-[var(--dc-surface)]" />
+                <div className="h-5 w-2/3 animate-pulse rounded-full bg-[var(--bg-secondary)]" />
+                <div className="h-4 w-1/2 animate-pulse rounded-full bg-[var(--bg-secondary)]" />
+                <div className="h-5 w-24 animate-pulse rounded-full bg-[var(--bg-secondary)]" />
               </div>
             </div>
           </div>
         ))}
       </div>
-      <div className="dc-glass rounded-[var(--dc-radius-lg)] space-y-4 p-5">
-        <div className="h-5 w-40 animate-pulse rounded-full bg-[var(--dc-surface)]" />
-        <div className="h-4 w-full animate-pulse rounded-full bg-[var(--dc-surface)]" />
-        <div className="h-4 w-5/6 animate-pulse rounded-full bg-[var(--dc-surface)]" />
-        <div className="h-12 w-full animate-pulse rounded-full bg-[var(--dc-surface)]" />
+      <div className="glass-card" style={{ padding: "24px" }}>
+        <div className="h-5 w-40 animate-pulse rounded-full bg-[var(--bg-secondary)]" />
+        <div className="mt-4 h-4 w-full animate-pulse rounded-full bg-[var(--bg-secondary)]" />
+        <div className="mt-2 h-4 w-5/6 animate-pulse rounded-full bg-[var(--bg-secondary)]" />
+        <div className="mt-6 h-11 w-full animate-pulse rounded-full bg-[var(--bg-secondary)]" />
       </div>
     </div>
   );

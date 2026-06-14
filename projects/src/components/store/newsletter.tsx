@@ -28,15 +28,15 @@ export function Newsletter() {
   }
 
   return (
-    <section className="dc-newsletter-luxe">
-      <div className="dc-container">
-        <div className="anim-fade-up">
-          <span className="dc-eyebrow">Stay connected</span>
-          <h2 className="dc-heading-md">Join the inner circle</h2>
-          <p className="dc-body-sm">
+    <section className="newsletter">
+      <div className="container">
+        <div className="newsletter-card anim-fade-up">
+          <span className="section-eyebrow">Stay connected</span>
+          <h2 className="display-md" style={{ marginBottom: "8px" }}>Join the inner circle</h2>
+          <p className="body">
             Be the first to know about new arrivals, exclusive drops, and curated edits.
           </p>
-          <form onSubmit={handleSubmit} className="dc-newsletter-luxe-form">
+          <form onSubmit={handleSubmit} className="newsletter-form">
             <input
               type="email"
               placeholder="Enter your email"

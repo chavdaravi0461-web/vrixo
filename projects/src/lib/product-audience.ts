@@ -6,6 +6,10 @@ const womenPattern = /\b(women|woman|women's|womens|ladies|lady|female|girls?|fo
 const menPattern = /\b(men|man's|mens|men's|male|gents?|boys?|for men|men s)\b/i;
 
 export function getProductAudience(product: Product): ProductAudience {
+  if (product.audience === "men" || product.audience === "women" || product.audience === "unisex") {
+    return product.audience;
+  }
+
   const text = [
     product.title,
     product.slug,

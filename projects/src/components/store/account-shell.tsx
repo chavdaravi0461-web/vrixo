@@ -1,45 +1,89 @@
+"use client";
+
 import Link from "next/link";
-import { LogoutButton } from "@/components/store/logout-button";
-import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { useState } from "react";
+import { User, ShoppingBag, Heart, Ticket, Gift, LogOut, Loader2 } from "lucide-react";
 
 const accountLinks = [
-  { href: "/account", label: "Overview" },
-  { href: "/profile", label: "Profile" },
-  { href: "/my-orders", label: "My Orders" },
-  { href: "/account/coupons", label: "My Coupons" },
-  { href: "/wishlist", label: "Wishlist" }
+  { href: "/account", label: "Overview", icon: User },
+  { href: "/profile", label: "Profile", icon: User },
+  { href: "/my-orders", label: "My Orders", icon: ShoppingBag },
+  { href: "/account/coupons", label: "My Coupons", icon: Gift },
+  { href: "/wishlist", label: "Wishlist", icon: Heart },
 ];
 
-export function AccountShell({
-  current,
-  showLogout = false,
-  children
-}: {
-  current: string;
-  showLogout?: boolean;
-  children: React.ReactNode;
-}) {
+export function AccountShell({ current, showLogout = false, children }: { current: string; showLogout?: boolean; children: React.ReactNode }) {
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    const supabase = createBrowserSupabaseClient();
+    await supabase.auth.signOut();
+    router.push("/");
+  }
+
   return (
-    <div className="container mt-10 grid gap-8 lg:grid-cols-[260px_1fr]">
-      <aside className="rounded-[2rem] bg-white p-5 card-shadow">
-        <h2 className="font-serif text-2xl font-semibold text-slate-950">My Account</h2>
-        <nav className="mt-5 grid gap-2">
-          {accountLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "rounded-2xl px-4 py-3 text-sm font-semibold transition",
-                current === link.href ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-100"
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-        {showLogout ? <LogoutButton className="mt-5 w-full justify-center" /> : null}
-      </aside>
-      <div>{children}</div>
+    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "32px 20px" }}>
+        <div style={{ display: "grid", gap: "24px", gridTemplateColumns: "240px 1fr" }}>
+
+          {/* Sidebar */}
+          <aside style={{
+            position: "sticky", top: "96px", alignSelf: "start",
+            padding: "20px", borderRadius: "var(--radius)",
+            background: "var(--bg-card)", border: "1px solid var(--border)",
+            height: "fit-content",
+          }}>
+            <h2 style={{ fontSize: "15px", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.01em", marginBottom: "16px" }}>
+              My Account
+            </h2>
+            <nav style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              {accountLinks.map((link) => {
+                const Icon = link.icon;
+                const isActive = current === link.href;
+                return (
+                  <Link key={link.href} href={link.href} style={{
+                    display: "flex", alignItems: "center", gap: "10px",
+                    padding: "10px 12px", borderRadius: "10px",
+                    textDecoration: "none", fontSize: "13px", fontWeight: 500,
+                    transition: "all 0.2s",
+                    background: isActive ? "var(--accent)" : "transparent",
+                    color: isActive ? "var(--bg)" : "var(--text-secondary)",
+                  }}>
+                    <Icon size={16} />
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {showLogout && (
+              <button
+                onClick={handleSignOut}
+                disabled={signingOut}
+                style={{
+                  marginTop: "16px", width: "100%",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                  padding: "10px 12px", borderRadius: "10px",
+                  border: "1px solid var(--border)", background: "transparent",
+                  color: "var(--text-muted)", fontSize: "13px", fontWeight: 500,
+                  cursor: signingOut ? "not-allowed" : "pointer",
+                  transition: "all 0.2s",
+                }}
+              >
+                {signingOut ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
+                {signingOut ? "Signing out..." : "Sign out"}
+              </button>
+            )}
+          </aside>
+
+          {/* Content */}
+          <div>{children}</div>
+        </div>
+      </div>
     </div>
   );
 }

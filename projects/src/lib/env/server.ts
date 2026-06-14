@@ -40,7 +40,9 @@ const optionalServerSchema = z.object({
   REDIS_URL: z.string().optional().default(""),
   VALKEY_URL: z.string().optional().default(""),
   GROQ_API_KEY: z.string().optional().default(""),
-  OPENAI_API_KEY: z.string().optional().default("")
+  OPENAI_API_KEY: z.string().optional().default(""),
+  RESEND_API_KEY: z.string().optional().default(""),
+  RESEND_FROM_EMAIL: z.string().optional().default("")
 });
 
 export function getOptionalServerEnv() {
@@ -76,7 +78,9 @@ export function getOptionalServerEnv() {
     REDIS_URL: process.env.REDIS_URL,
     VALKEY_URL: process.env.VALKEY_URL,
     GROQ_API_KEY: process.env.GROQ_API_KEY,
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL || "Vrixo <notifications@vrixo.in>"
   });
 }
 

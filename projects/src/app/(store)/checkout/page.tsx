@@ -19,27 +19,29 @@ export default async function CheckoutPage() {
   const shippingSettings = await getShippingSettings();
 
   return (
-    <section className="dc-container mt-6">
-      <div className="dc-page-hero p-5 md:p-8">
-      <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--dc-gold)]">Checkout</p>
-      <h1 className="mt-1 text-4xl font-black leading-tight text-[var(--dc-heading)] md:text-5xl">Complete your order</h1>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--dc-muted)]">
-        {liveOrderReady
-          ? onlinePaymentReady
-            ? "Choose Cash on Delivery or pay securely online."
-            : "Cash on Delivery is available. Online payment will be shown when available."
-          : publicSupabaseConfigured
-            ? "Cash on Delivery is available. Online payment will be shown when available."
-            : "Checkout is temporarily unavailable. Please contact support for help placing your order."}
-      </p>
-      </div>
-      <div className="mt-4">
-        <CheckoutForm
-          userId={user?.id ?? null}
-          liveOrderReady={liveOrderReady}
-          onlinePaymentReady={onlinePaymentReady}
-          shippingSettings={shippingSettings}
-        />
+    <section className="section" style={{ paddingTop: "24px" }}>
+      <div className="container">
+        <div className="glass-card p-6 md:p-8 anim-fade-up">
+          <p className="eyebrow">Checkout</p>
+          <h1 className="display-xl" style={{ marginTop: "8px" }}>Complete your order</h1>
+          <p className="body" style={{ marginTop: "8px" }}>
+            {liveOrderReady
+              ? onlinePaymentReady
+                ? "Choose Cash on Delivery or pay securely online."
+                : "Cash on Delivery is available. Online payment will be shown when available."
+              : publicSupabaseConfigured
+                ? "Cash on Delivery is available. Online payment will be shown when available."
+                : "Checkout is temporarily unavailable. Please contact support for help placing your order."}
+          </p>
+        </div>
+        <div className="mt-4">
+          <CheckoutForm
+            userId={user?.id ?? null}
+            liveOrderReady={liveOrderReady}
+            onlinePaymentReady={onlinePaymentReady}
+            shippingSettings={shippingSettings}
+          />
+        </div>
       </div>
     </section>
   );

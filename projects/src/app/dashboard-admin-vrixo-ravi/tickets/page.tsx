@@ -4,7 +4,7 @@ import { buildMetadata } from "@/lib/metadata";
 import { requireAdmin } from "@/lib/auth";
 import { getTickets } from "@/lib/support/tickets";
 
-export const metadata = buildMetadata("Admin Support Tickets");
+export const metadata = buildMetadata("Support Tickets — VRIXO Admin");
 export const dynamic = "force-dynamic";
 
 export default async function AdminTicketsPage() {
@@ -12,17 +12,19 @@ export default async function AdminTicketsPage() {
   const tickets = await getTickets({ limit: 100 });
 
   return (
-    <AdminShell current="/dashboard-admin-vrixo-ravi/tickets">
-      <section className="os-hero mb-6 p-5 md:p-6">
-        <div className="relative z-10">
-          <div className="flex items-center gap-2">
-            <span className="os-dot live" />
-            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-[var(--os-text-3)]">Support</span>
+    <AdminShell>
+      <section className="cos-section" style={{ marginBottom: "16px" }}>
+        <div className="cos-section-header">
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+              <span className="cos-section-eyebrow">Support</span>
+            </div>
+            <h1 className="cos-section-title" style={{ fontSize: "18px" }}>Support Tickets</h1>
+            <p className="cos-section-sub">Manage customer support tickets, replies, and escalations.</p>
           </div>
-          <h1 className="mt-3 text-2xl font-bold text-white md:text-3xl tracking-tight">Support Tickets</h1>
-          <p className="mt-1 max-w-xl text-sm text-[var(--os-text-3)]">
-            Manage customer support tickets, replies, and escalations.
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span className="cos-pill cos-pill-live">Live</span>
+          </div>
         </div>
       </section>
       <TicketsAdminClient initialTickets={tickets} />

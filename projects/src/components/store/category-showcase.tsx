@@ -32,23 +32,24 @@ export function CategoryShowcase({ products = [] }: { products?: Product[] }) {
   ];
 
   return (
-    <section className="dc-section-tight">
-      <div className="dc-container">
-        <div className="mb-10 text-center anim-fade-up">
-          <span className="dc-eyebrow">Collections</span>
-          <h2 className="dc-heading-md">Browse by category</h2>
+    <section className="section">
+      <div className="container">
+        <div className="section-header anim-fade-up">
+          <span className="section-eyebrow">Collections</span>
+          <h2 className="section-title">Browse by category</h2>
         </div>
-        <div className="dc-category-grid anim-stagger-grid">
+        <div className="cat-grid anim-stagger">
           {cats.map((cat, i) => {
             const img = cat.img ? normalizeProductImage(cat.img.images?.[0]) ?? getFallbackProductImage() : getFallbackProductImage();
             return (
               <div key={i} className="anim-fade-up" style={{ animationDelay: `${i * 0.1}s` }}>
-                <Link href={cat.href} className="dc-category-card">
-                  <Image src={img} alt={cat.title} width={400} height={400} className="w-full" />
-                  <div className="dc-category-card-body">
-                    <p className="cat-label">{cat.label}</p>
-                    <p className="cat-title">{cat.title}</p>
-                    <span className="cat-link">Shop now <ArrowRight className="h-3 w-3" /></span>
+                <Link href={cat.href} className="cat-card block">
+                  <Image src={img} alt={cat.title} width={400} height={400} className="w-full h-full object-cover" />
+                  <div className="cat-card-overlay" />
+                  <div className="cat-card-body">
+                    <p className="cat-card-label">{cat.label}</p>
+                    <p className="cat-card-title">{cat.title}</p>
+                    <span className="cat-card-link">Shop now <ArrowRight className="h-3 w-3 inline" /></span>
                   </div>
                 </Link>
               </div>

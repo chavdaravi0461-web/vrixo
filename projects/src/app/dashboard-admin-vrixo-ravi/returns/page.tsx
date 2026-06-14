@@ -45,7 +45,7 @@ export default function AdminReturnsPage() {
   }
 
   return (
-    <AdminShell current="/dashboard-admin-vrixo-ravi/returns">
+    <AdminShell>
       <section className="os-hero mb-6 p-5 md:p-6">
         <div className="relative z-10">
           <div className="flex items-center gap-2">

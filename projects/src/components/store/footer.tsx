@@ -28,29 +28,23 @@ const footerLinks = {
 
 export function Footer() {
   return (
-    <footer className="dc-footer-luxe">
-      <div className="dc-container">
-        {/* Brand Strip */}
-        <div className="dc-footer-luxe-brand">
-          <span>Vrixo</span>
-          <small>Since 2025</small>
-        </div>
-
-        {/* Main Grid */}
-        <div className="dc-footer-luxe-grid">
-          <div className="dc-footer-luxe-col">
-            <p>
+    <footer className="footer">
+      <div className="container">
+        <div className="footer-grid">
+          <div>
+            <span className="display-md" style={{ color: "var(--text)" }}>Vrixo</span>
+            <p className="footer-brand-desc">
               Premium shoes and timeless watches. Every piece selected for those who recognise the extraordinary.
             </p>
-            <div className="dc-footer-luxe-contact">
-              <Mail />
-              <a href={SUPPORT_EMAIL_HREF}>{SUPPORT_EMAIL}</a>
+            <div className="flex items-center gap-2 mt-4 body-sm">
+              <Mail className="h-3.5 w-3.5" />
+              <a href={SUPPORT_EMAIL_HREF} style={{ color: "var(--text-secondary)", textDecoration: "none" }}>{SUPPORT_EMAIL}</a>
             </div>
-            <div className="dc-footer-luxe-trust">
-              <span><Truck /> Free COD</span>
-              <span><Shield /> Secure Payment</span>
-              <span><Repeat /> 7-Day Return</span>
-              <span><Clock /> Same Day Dispatch</span>
+            <div className="flex flex-wrap gap-4 mt-4 body-sm" style={{ color: "var(--text-muted)" }}>
+              <span className="flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Free COD</span>
+              <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5" /> Secure Payment</span>
+              <span className="flex items-center gap-1.5"><Repeat className="h-3.5 w-3.5" /> 7-Day Return</span>
+              <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Same Day Dispatch</span>
             </div>
           </div>
           <FooterColumn title="Shop" links={footerLinks.shop} />
@@ -58,14 +52,13 @@ export function Footer() {
           <FooterColumn title="Policies" links={footerLinks.policies} />
         </div>
 
-        {/* Bottom Bar */}
-        <div className="dc-footer-luxe-bottom">
+        <div className="footer-bottom">
           <p>Luxury in every detail — <strong>Vrixo</strong> &copy;2025 to 2026</p>
-          <div className="dc-footer-luxe-bottom-links">
-            <Link href="/terms-and-conditions">Terms</Link>
-            <Link href="/privacy-policy">Privacy</Link>
-            <Link href="/shipping-policy">Shipping</Link>
-            <Link href="/refund-return-policy">Returns</Link>
+          <div className="flex gap-4">
+            <Link href="/terms-and-conditions" className="footer-link">Terms</Link>
+            <Link href="/privacy-policy" className="footer-link">Privacy</Link>
+            <Link href="/shipping-policy" className="footer-link">Shipping</Link>
+            <Link href="/refund-return-policy" className="footer-link">Returns</Link>
           </div>
         </div>
       </div>
@@ -75,11 +68,13 @@ export function Footer() {
 
 function FooterColumn({ title, links }: { title: string; links: Array<{ href: string; label: string }> }) {
   return (
-    <div className="dc-footer-luxe-col">
-      <h4>{title}</h4>
-      {links.map((l) => (
-        <Link key={l.href} href={l.href}>{l.label}</Link>
-      ))}
+    <div>
+      <h4 className="footer-col-title">{title}</h4>
+      <div className="footer-links">
+        {links.map((l) => (
+          <Link key={l.href} href={l.href} className="footer-link">{l.label}</Link>
+        ))}
+      </div>
     </div>
   );
 }

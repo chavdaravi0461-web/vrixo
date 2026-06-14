@@ -35,7 +35,6 @@ export const POST = safeRoute(async function POST(request: Request) {
   }
 
   const insertPayload = { ...payload };
-  delete (insertPayload as Partial<typeof payload>).highlighted;
   const { data, error } = await supabase.from("products").insert(insertPayload).select("id, slug").single();
 
   if (error) {

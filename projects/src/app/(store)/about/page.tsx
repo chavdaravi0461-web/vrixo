@@ -1,10 +1,10 @@
 import { getAppUrl } from "@/lib/app-url";
+import { buildMetadata } from "@/lib/metadata";
 
-export const metadata = {
-  title: "About Vrixo | Vrixo",
-  description:
-    "Vrixo is a premium online shopping brand , offering shoes, watches, and fashion products with a clean, trusted, and customer-friendly shopping experience in India.",
-};
+export const metadata = buildMetadata(
+  "About Vrixo",
+  "Vrixo is a premium online shopping brand, offering shoes, watches, and fashion products with a clean, trusted, and customer-friendly shopping experience in India."
+);
 
 export default function AboutPage() {
   const appUrl = getAppUrl();

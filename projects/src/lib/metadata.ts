@@ -13,6 +13,7 @@ export function buildMetadata(
   return {
     title: fullTitle,
     description,
+    alternates: { canonical: appUrl },
     openGraph: {
       title: fullTitle,
       description,

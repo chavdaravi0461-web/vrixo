@@ -2,16 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, ShoppingBag, Eye } from "lucide-react";
+import { Heart, ShoppingBag, Eye, Star } from "lucide-react";
 import { cleanProductTitle, formatCurrency } from "@/lib/utils";
 import { normalizeProductImage } from "@/lib/product-images";
 import { useCartStore } from "@/lib/store/cart-store";
 import { useWishlistStore } from "@/lib/store/wishlist-store";
-import { useState } from "react";
+import { useState, memo } from "react";
 import { toast } from "sonner";
 import type { Product } from "@/types/index";
 
-export function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
+const ProductCardUnmemoized = ({ product, index = 0 }: { product: Product; index?: number }) => {
   const img = normalizeProductImage(product.images?.[0]);
   const hasDiscount = product.discountPercent > 0 && product.originalPrice > product.price;
   const inStock = (product.stock ?? 0) > 0;
@@ -39,43 +39,55 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
 
   return (
     <div
-      className="dc-card-luxe group anim-fade-up"
+      className="p-card anim-fade-up"
       style={{ animationDelay: `${delay}s` }}
     >
-      <Link href={`/product/${product.slug}`} className="block dc-card-luxe-image">
-        {showFallback ? (
-          <div className="flex h-full w-full items-center justify-center text-[var(--dc-muted-2)]">
-            <Eye className="h-8 w-8 opacity-30" />
-          </div>
-        ) : (
-          <Image
-            src={img}
-            alt={product.title}
-            fill
-            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
-            priority={index < 4}
-            loading={index < 4 ? "eager" : "lazy"}
-            quality={85}
-            className="object-cover"
-            onError={() => setImgFailed(true)}
-          />
-        )}
-        <div className="dc-card-luxe-overlay" />
-        {hasDiscount && (
-          <span className="absolute top-3 left-3 z-10 dc-badge-luxe text-[var(--dc-danger)] border-[var(--dc-danger)]">
-            -{product.discountPercent}%
-          </span>
-        )}
-        {!inStock && (
-          <span className="absolute top-3 left-3 z-10 dc-badge-luxe text-[var(--dc-muted)] border-[var(--dc-border)]">
-            Sold out
-          </span>
-        )}
-      </Link>
+      <div className="p-card-image">
+        <Link href={`/product/${product.slug}`}>
+          {showFallback ? (
+            <div className="flex h-full w-full items-center justify-center text-[var(--text-muted)]">
+              <Eye className="h-8 w-8 opacity-30" />
+            </div>
+          ) : (
+            <Image
+              src={img}
+              alt={product.title}
+              fill
+              sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+              priority={index < 4}
+              loading={index < 4 ? "eager" : "lazy"}
+              quality={85}
+              className="object-cover"
+              onError={() => setImgFailed(true)}
+            />
+          )}
+        </Link>
+        <div className="p-card-overlay" />
+        <div className="p-card-badges">
+          {product.bestseller && (
+            <span className="p-card-badge p-card-badge-sale">Bestseller</span>
+          )}
+          {product.featured && !product.bestseller && (
+            <span className="p-card-badge p-card-badge-featured">Featured</span>
+          )}
+          {product.newArrival && (
+            <span className="p-card-badge p-card-badge-new">New Arrival</span>
+          )}
+          {hasDiscount && (
+            <span className="p-card-badge p-card-badge-sale">-{product.discountPercent}%</span>
+          )}
+          {!inStock && (
+            <span className="p-card-badge p-card-badge-sold">Sold out</span>
+          )}
+          {inStock && product.stock > 0 && product.stock <= 3 && (
+            <span className="p-card-badge p-card-badge-sale">Only {product.stock} left</span>
+          )}
+        </div>
+      </div>
 
       <button
         type="button"
-        className="dc-card-luxe-wish z-10"
+        className="p-card-action"
         aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
         onClick={(e) => {
           e.preventDefault();
@@ -83,40 +95,45 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           toast.success(wished ? "Removed from wishlist" : `${cleanProductTitle(product.title)} added to wishlist`);
         }}
       >
-        <Heart className={wished ? "fill-red-500 text-red-500" : ""} />
+        <Heart className={`h-[15px] w-[15px] ${wished ? "fill-[var(--accent)] text-[var(--accent)]" : ""}`} />
       </button>
 
       {requiresSelection ? (
-        <Link
-          href={`/product/${product.slug}`}
-          className="dc-card-luxe-actions"
-        >
-          <span className="dc-card-luxe-btn dc-card-luxe-btn-primary">
-            <Eye className="h-3.5 w-3.5" /> View options
+        <Link href={`/product/${product.slug}`} className="p-card-actions">
+          <span className="p-card-action">
+            <Eye className="h-[15px] w-[15px]" />
           </span>
         </Link>
       ) : (
-        <div className="dc-card-luxe-actions">
-          <button
-            type="button"
-            className="dc-card-luxe-btn dc-card-luxe-btn-primary"
-            onClick={handleAdd}
-          >
-            <ShoppingBag className="h-3.5 w-3.5" /> {inStock ? "Add to cart" : "Sold out"}
+        <div className="p-card-actions">
+          <button type="button" className="p-card-action" onClick={handleAdd}>
+            <ShoppingBag className="h-[15px] w-[15px]" />
           </button>
         </div>
       )}
 
-      <div className="dc-card-luxe-body">
-        <p className="dc-card-luxe-brand">{product.brand || product.category}</p>
+      <div className="p-card-body">
+        <p className="p-card-category">{product.brand || product.category}</p>
         <Link href={`/product/${product.slug}`}>
-          <h3 className="dc-card-luxe-title">{displayTitle}</h3>
+          <h3 className="p-card-title">{displayTitle}</h3>
         </Link>
-        <div className="dc-card-luxe-price">
+        {product.rating > 0 ? (
+          <div className="flex items-center gap-1" style={{ marginTop: "4px" }}>
+            <Star className="h-3 w-3 fill-[var(--accent)]" style={{ color: "var(--accent)" }} />
+            <span className="body-sm" style={{ fontSize: "12px" }}>{product.rating.toFixed(1)}</span>
+            <span className="body-sm" style={{ fontSize: "11px", color: "var(--text-muted)" }}>({product.reviewCount})</span>
+          </div>
+        ) : null}
+        <div className="p-card-price">
           {formatCurrency(product.price)}
-          {hasDiscount && <span className="original">{formatCurrency(product.originalPrice)}</span>}
+          {hasDiscount && <span className="p-card-price-original">{formatCurrency(product.originalPrice)}</span>}
         </div>
+        <button type="button" className="p-card-add" onClick={handleAdd}>
+          {inStock ? "Add to cart" : "Sold out"}
+        </button>
       </div>
     </div>
   );
 }
+
+export const ProductCard = memo(ProductCardUnmemoized);

@@ -20,7 +20,7 @@ const faqs = [
   },
   {
     q: "How long does delivery take?",
-    a: "Delivery time depends on your location and product availability. We aim to process orders within 24 hours and provide tracking information once shipped."
+    a: "Delivery time depends on your location and product availability. We aim to process orders within 4-5 Days and provide tracking information once shipped."
   },
   {
     q: "What is the return and refund policy?",
@@ -94,8 +94,19 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 }
 
 export default function FAQPage() {
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.q,
+      acceptedAnswer: { "@type": "Answer", text: faq.a }
+    }))
+  };
+
   return (
     <section className="container mt-10">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <div className="mx-auto max-w-3xl">
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--dc-primary)]">Vrixo</p>
         <h1 className="mt-3 font-serif text-4xl font-semibold text-[var(--dc-heading)]">

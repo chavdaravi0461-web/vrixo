@@ -2,23 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { hasServerSupabaseAdminEnv } from "@/lib/env/server";
 import { getIndianMobileLookupVariants, normalizeIndianMobileNumber } from "@/lib/phone";
-import { checkRateLimit } from "@/lib/security";
+import { checkServerRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route";
 import { sanitizeRedirectPath } from "@/lib/safe-navigation";
 import { safeRoute } from "@/lib/safe-route";
+import { requireSameOrigin } from "@/lib/server/origin-check";
+import { tooManyRequests } from "@/lib/api-response";
+// @ts-expect-error — firebase/users.js has no type declarations
+import { createUser as createFirebaseUser } from "@/lib/firebase/users";
 
 const passwordSignupSchema = z.object({
   name: z.string().trim().min(2, "Enter your full name."),
-  phone: z.string().trim().min(10, "Enter a valid mobile number."),
+  phone: z.string().trim().min(10, "Enter a valid mobile number.").optional().default(""),
   email: z.string().trim().toLowerCase().email("Enter a valid email address."),
   password: z.string().min(6, "Password must be at least 6 characters."),
   next: z.string().trim().max(500).optional()
 });
 
 export const POST = safeRoute(async function POST(request: NextRequest) {
-  const rateLimit = checkRateLimit(request, { key: "signup", limit: 5, windowMs: 10 * 60 * 1000 });
-  if (rateLimit) return rateLimit;
+  const originCheck = requireSameOrigin(request);
+  if (originCheck) return originCheck;
+  const rateLimit = await checkServerRateLimit(request, { key: "signup", limit: 5, windowMs: 10 * 60 * 1000 });
+  if (!rateLimit.allowed) return tooManyRequests(rateLimit.retryAfter);
 
   const parsed = passwordSignupSchema.safeParse(await request.json().catch(() => null));
 
@@ -36,31 +42,29 @@ export const POST = safeRoute(async function POST(request: NextRequest) {
     );
   }
 
-  const normalizedPhone = normalizeIndianMobileNumber(parsed.data.phone);
-
-  if (!normalizedPhone) {
-    return NextResponse.json({ message: "Enter a valid Indian mobile number." }, { status: 400 });
-  }
+  const normalizedPhone = parsed.data.phone ? normalizeIndianMobileNumber(parsed.data.phone) : null;
 
   const adminSupabase = createAdminClient();
 
-  const duplicatePhone = await findExistingProfileByPhone(adminSupabase, normalizedPhone);
-  if (duplicatePhone) {
-    return NextResponse.json(
-      { message: "An account with this mobile number already exists. Please login instead." },
-      { status: 409 }
-    );
+  if (normalizedPhone) {
+    const duplicatePhone = await findExistingProfileByPhone(adminSupabase, normalizedPhone);
+    if (duplicatePhone) {
+      return NextResponse.json(
+        { message: "An account with this mobile number already exists. Please login instead." },
+        { status: 409 }
+      );
+    }
   }
 
   const { data: created, error: createError } = await adminSupabase.auth.admin.createUser({
     email: parsed.data.email,
-    phone: normalizedPhone,
+    phone: normalizedPhone || undefined,
     password: parsed.data.password,
     email_confirm: true,
     phone_confirm: true,
     user_metadata: {
       name: parsed.data.name,
-      phone: normalizedPhone
+      phone: normalizedPhone || ""
     }
   });
 
@@ -76,7 +80,7 @@ export const POST = safeRoute(async function POST(request: NextRequest) {
       id: created.user.id,
       name: parsed.data.name,
       email: parsed.data.email,
-      phone: normalizedPhone,
+      phone: normalizedPhone || "",
       role: "customer",
       is_active: true
     },
@@ -90,6 +94,16 @@ export const POST = safeRoute(async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+
+  // Also create Firebase user so NextAuth login works
+  await createFirebaseUser({
+    name: parsed.data.name,
+    email: parsed.data.email,
+    password: parsed.data.password,
+    provider: "credentials",
+  }).catch((err: any) => {
+    console.error("[password-signup] firebase sync failed (non-fatal):", err?.message);
+  });
 
   const response = NextResponse.json({
     redirectTo: sanitizeRedirectPath(parsed.data.next)

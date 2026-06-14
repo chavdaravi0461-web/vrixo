@@ -22,6 +22,7 @@ export type Product = {
   bestseller: boolean;
   newArrival: boolean;
   highlighted: boolean;
+  audience?: "men" | "women" | "unisex";
   displaySections?: import("@/lib/product-display").ProductDisplaySection[];
   status?: "active" | "draft" | "archived";
   rating: number;

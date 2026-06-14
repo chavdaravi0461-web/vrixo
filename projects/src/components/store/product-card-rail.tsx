@@ -18,28 +18,28 @@ export function ProductCardRail({ product }: { product: Product }) {
   const requiresSelection = Boolean(product.sizes?.length || product.colors?.length);
 
   return (
-    <div className="dc-card-luxe anim-fade-up-fast">
-      <Link href={`/product/${product.slug}`} className="block dc-card-luxe-image" style={{ aspectRatio: "4/5" }}>
+    <div className="p-card anim-fade-up">
+      <Link href={`/product/${product.slug}`} className="block p-card-image" style={{ aspectRatio: "4/5" }}>
         <Image src={img} alt={product.title} fill sizes="220px" className="object-cover" loading="lazy" />
-        <div className="dc-card-luxe-overlay" />
+        <div className="p-card-overlay" />
         {hasDiscount && (
-          <span className="absolute top-2 left-2 z-10 dc-badge-luxe text-[var(--dc-danger)] border-[var(--dc-danger)] text-[8px]">
+          <span className="p-card-badge p-card-badge-sale" style={{ top: "8px", left: "8px" }}>
             -{product.discountPercent}%
           </span>
         )}
         {!inStock && (
-          <span className="absolute top-2 left-2 z-10 dc-badge-luxe text-[var(--dc-muted)] border-[var(--dc-border)] text-[8px]">
+          <span className="p-card-badge p-card-badge-sold" style={{ top: "8px", left: "8px" }}>
             Sold out
           </span>
         )}
       </Link>
 
-      <div className="dc-card-luxe-actions" style={{ bottom: "auto", top: "8px", left: "auto", right: "8px", opacity: 1, transform: "none" }}>
+      <div style={{ position: "absolute", top: "8px", right: "8px", opacity: 1, transform: "none" }}>
         <button
           type="button"
-          className="dc-card-luxe-btn dc-card-luxe-btn-secondary"
-          style={{ padding: "6px 10px", fontSize: "10px", flex: "none" }}
-          aria-label={requiresSelection ? "Quick add" : "Quick add"}
+          className="p-card-action"
+          style={{ width: "30px", height: "30px" }}
+          aria-label="Quick add"
           disabled={!inStock}
           onClick={() => {
             if (requiresSelection) {
@@ -57,14 +57,14 @@ export function ProductCardRail({ product }: { product: Product }) {
         </button>
       </div>
 
-      <div className="dc-card-luxe-body" style={{ padding: "10px 0 0" }}>
-        <p className="dc-card-luxe-brand" style={{ fontSize: "9px" }}>{product.brand || product.category}</p>
+      <div className="p-card-body" style={{ padding: "10px 0 0" }}>
+        <p className="p-card-category" style={{ fontSize: "9px" }}>{product.brand || product.category}</p>
         <Link href={`/product/${product.slug}`}>
-          <h3 className="dc-card-luxe-title" style={{ fontSize: "13px" }}>{displayTitle}</h3>
+          <h3 className="p-card-title" style={{ fontSize: "13px" }}>{displayTitle}</h3>
         </Link>
-        <div className="dc-card-luxe-price" style={{ fontSize: "13px" }}>
+        <div className="p-card-price" style={{ fontSize: "13px" }}>
           {formatCurrency(product.price)}
-          {hasDiscount && <span className="original" style={{ fontSize: "11px" }}>{formatCurrency(product.originalPrice)}</span>}
+          {hasDiscount && <span className="p-card-price-original" style={{ fontSize: "11px" }}>{formatCurrency(product.originalPrice)}</span>}
         </div>
       </div>
     </div>

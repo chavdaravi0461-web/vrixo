@@ -8,6 +8,7 @@ import { getProducts } from "@/services/products";
 import type { Product } from "@/types/index";
 
 export const metadata = buildMetadata("Shop");
+export const revalidate = 300;
 
 export default async function ShopPage({
   searchParams
@@ -47,29 +48,25 @@ export default async function ShopPage({
   const categoryChips = buildCategoryChips(allProducts);
 
   return (
-    <section className="pb-12 pt-6">
-      <div className="dc-container">
-        <div className="dc-page-hero p-5 md:p-8">
-          <div className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-[var(--dc-muted)]">
-            <Link href="/home" className="hover:text-[var(--dc-gold)]">Home</Link>
+    <section className="section" style={{ paddingTop: "24px" }}>
+      <div className="container">
+        <div className="glass-card p-6 md:p-8 anim-fade-up">
+          <div className="mb-4 flex items-center gap-2 body-sm" style={{ color: "var(--text-muted)" }}>
+            <Link href="/home" className="hover:text-[var(--accent)]" style={{ color: "inherit", textDecoration: "none" }}>Home</Link>
             <span>/</span>
-            <span className="text-[var(--dc-heading)]">Shop</span>
+            <span style={{ color: "var(--text)" }}>Shop</span>
           </div>
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--dc-gold)]">
-                Vrixo catalog
-              </p>
-              <h1 className="mt-2 text-4xl font-black leading-tight text-[var(--dc-heading)] md:text-6xl">
-                Premium shoes and watches
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--dc-muted)]">
+              <p className="eyebrow">Vrixo catalog</p>
+              <h1 className="display-xl" style={{ marginTop: "8px" }}>Premium shoes and watches</h1>
+              <p className="body" style={{ marginTop: "8px", maxWidth: "480px" }}>
                 Browse polished footwear and watch styles with secure checkout, COD, and verified online payments.
               </p>
             </div>
-            <div className="rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] bg-[var(--dc-bg-deep)] px-5 py-4 text-[var(--dc-heading)]">
-              <p className="text-xs uppercase tracking-[0.18em] text-[var(--dc-gold)]">Showing</p>
-              <p className="text-2xl font-bold">{products.length} products</p>
+            <div className="glass-card" style={{ padding: "16px 20px", minWidth: "140px", textAlign: "center" }}>
+              <p className="eyebrow">Showing</p>
+              <p className="display-md" style={{ marginTop: "4px" }}>{products.length}</p>
             </div>
           </div>
           <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
@@ -77,11 +74,12 @@ export default async function ShopPage({
               <Link
                 key={chip.href}
                 href={chip.href}
-                className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.12em] transition ${
+                className={`shrink-0 rounded-full border px-4 py-2 text-xs font-medium tracking-[0.06em] transition ${
                   chip.active(current)
-                    ? "border-[var(--dc-gold)] bg-[var(--dc-gold)] text-black"
-                    : "border-[var(--dc-border)] bg-[var(--dc-surface)] text-[var(--dc-muted)] hover:border-[var(--dc-gold)] hover:text-[var(--dc-heading)]"
+                    ? "bg-[var(--accent)] text-[var(--bg)] border-[var(--accent)]"
+                    : "border-[var(--border)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,.12)] hover:text-[var(--text)]"
                 }`}
+                style={{ textTransform: "uppercase", letterSpacing: ".06em", textDecoration: "none" }}
               >
                 {chip.label}
               </Link>
@@ -98,7 +96,7 @@ export default async function ShopPage({
           />
         </div>
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-[290px_1fr]">
+        <div className="mt-5 grid gap-5 lg:grid-cols-[280px_1fr]">
           <FiltersSidebar products={allProducts} current={current} className="hidden lg:block" />
           <div>
             {products.length > 0 ? (
@@ -130,31 +128,10 @@ function getNumber(value: string | string[] | undefined) {
 function buildCategoryChips(products: Product[]) {
   const subcategories = new Set(products.map((product) => product.subcategory.toLowerCase()));
   const chips = [
-    {
-      label: "All",
-      href: "/shop",
-      active: (current: Record<string, string | undefined>) => !current.category && !current.subcategory
-    },
-    {
-      label: "Shoes",
-      href: "/shop?category=shoes",
-      active: (current: Record<string, string | undefined>) => current.category === "shoes" && !current.subcategory
-    },
-    {
-      label: "Watches",
-      href: "/shop?category=watches",
-      active: (current: Record<string, string | undefined>) => current.category === "watches" && !current.subcategory
-    },
-    {
-      label: "Men",
-      href: "/shop?audience=men",
-      active: (current: Record<string, string | undefined>) => current.audience === "men"
-    },
-    {
-      label: "Women",
-      href: "/shop?audience=women",
-      active: (current: Record<string, string | undefined>) => current.audience === "women"
-    }
+    { label: "All", href: "/shop", active: (current: Record<string, string | undefined>) => !current.category && !current.subcategory && !current.audience },
+    { label: "Men's Footwear", href: "/shop?category=shoes&audience=men", active: (current: Record<string, string | undefined>) => current.category === "shoes" && current.audience === "men" },
+    { label: "Women's Footwear", href: "/shop?category=shoes&audience=women", active: (current: Record<string, string | undefined>) => current.category === "shoes" && current.audience === "women" },
+    { label: "Watches", href: "/shop?category=watches", active: (current: Record<string, string | undefined>) => current.category === "watches" && !current.subcategory }
   ];
 
   ["Sneakers", "Sandals", "Formal Shoes", "Casual Shoes", "Sports Shoes"].forEach((label) => {

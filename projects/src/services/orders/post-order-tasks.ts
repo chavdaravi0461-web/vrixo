@@ -3,11 +3,11 @@ import { publishEvent } from "@/lib/event-bus";
 import { markCouponUsed } from "@/lib/game-coupons";
 import { recordPaidOrderMemory, trackBehaviorEvent } from "@/services/behavior/customer-intelligence";
 import { logInfo, logWarn, logError } from "@/lib/observability";
-import {
-  dispatchOrderNotification,
-  enqueueOrderConfirmationNotification
-} from "@/lib/notification-queue";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { hasEmailEnv, sendEmail } from "@/lib/email";
+import { buildOrderConfirmationEmailHtml } from "@/lib/email-templates/order-confirmation";
+import { sendOrderConfirmationWhatsApp, formatWhatsAppPhone, hasWhatsAppServerEnv } from "@/lib/whatsapp";
+import { getAppUrl } from "@/lib/app-url";
 
 export type PostOrderTaskInput = {
   orderId: string;
@@ -30,7 +30,7 @@ export type PostOrderTaskInput = {
 };
 
 export type PostOrderTaskResult = {
-  whatsapp: { sent: boolean; skipped?: boolean; reason?: string; error?: string };
+  whatsapp: { sent: boolean; error?: string };
   coupon: { used: boolean; error?: string };
   events: { published: boolean };
   behavior: { tracked: boolean };
@@ -65,8 +65,6 @@ export async function runPostOrderTasks(input: PostOrderTaskInput): Promise<Post
     whatsappResult.status === "fulfilled"
       ? {
           sent: Boolean(whatsappValue?.sent),
-          skipped: whatsappValue?.skipped,
-          reason: whatsappValue?.reason
         }
       : { sent: false, error: extractError(whatsappResult.reason) };
 
@@ -91,42 +89,109 @@ export async function runPostOrderTasks(input: PostOrderTaskInput): Promise<Post
 
 async function sendCustomerWhatsApp(input: PostOrderTaskInput) {
   const logPayload = { orderId: input.orderId, orderNumber: input.orderNumber };
-  const supabase = createAdminClient();
-  try {
-    const notificationId = await enqueueOrderConfirmationNotification(supabase, input.orderId);
-    if (!notificationId) {
-      return {
-        queued: false,
-        sent: false,
-        skipped: true,
-        reason: "online_payment_not_confirmed"
-      };
-    }
+  let whatsappSent = false;
 
-    logInfo("post_order_tasks.whatsapp.outbox_enqueued", { ...logPayload, notificationId });
-    const result = await dispatchOrderNotification(supabase, notificationId);
-    if (result.sent) {
-      logInfo("post_order_tasks.whatsapp.sent", {
-        ...logPayload,
-        notificationId,
-        providerMessageId: result.providerMessageId
-      });
-      return { queued: true, sent: true };
-    }
+  // Step 1: Try direct WhatsApp send (primary path)
+  if (hasWhatsAppServerEnv()) {
+    const formattedPhone = formatWhatsAppPhone(input.customerPhone);
+    if (formattedPhone) {
+      const items = input.items || [];
+      const productNames = items
+        .map((item) => String(item.title ?? ""))
+        .filter(Boolean)
+        .join(", ") || "Vrixo product";
+      const totalQty = items.reduce(
+        (sum, item) => sum + (typeof item.quantity === "number" ? item.quantity : 1),
+        0
+      );
+      const firstItem = items[0] && typeof items[0] === "object" ? (items[0] as Record<string, unknown>) : {};
+      const rawImage = String(firstItem.image ?? firstItem.productImageUrl ?? "");
+      const appUrl = getAppUrl();
+      const productImageUrl = rawImage
+        ? (() => { try { return new URL(rawImage, appUrl).toString(); } catch { return `${appUrl}/placeholder-product.svg`; } })()
+        : `${appUrl}/placeholder-product.svg`;
 
-    logWarn("post_order_tasks.whatsapp.retry_scheduled", {
-      ...logPayload,
-      notificationId,
-      error: result.error
-    });
-    return { queued: true, sent: false, error: result.error ?? undefined };
-  } catch (error) {
-    logError("post_order_tasks.whatsapp.outbox_failed", {
-      ...logPayload,
-      error: extractError(error)
-    });
-    throw error;
+      const addr = input.shippingAddress as Record<string, unknown> | null;
+      const address = addr
+        ? [addr.line1, addr.line2, addr.city, addr.state, addr.postalCode, addr.country]
+            .map((p) => (p ? String(p).trim() : ""))
+            .filter(Boolean)
+            .join(", ")
+        : "Delivery address saved with your order";
+
+      try {
+        const result = await sendOrderConfirmationWhatsApp({
+          customerName: input.customerName,
+          customerPhone: formattedPhone,
+          orderNumber: input.orderNumber,
+          productNames,
+          totalQty,
+          totalAmount: input.total,
+          orderStatus: input.orderStatus,
+          paymentMethod: input.paymentMethod,
+          paymentStatus: input.paymentStatus,
+          productImageUrl,
+          deliveryAddress: address
+        });
+
+        if (result.sent) {
+          logInfo("post_order_tasks.whatsapp.direct_sent", {
+            ...logPayload,
+            providerMessageId: result.customerMessageId
+          });
+          whatsappSent = true;
+
+          // Update order whatsapp_status
+          const supabase = createAdminClient();
+          await supabase
+            .from("orders")
+            .update({ whatsapp_status: "sent", whatsapp_error: null })
+            .eq("id", input.orderId);
+        } else {
+          logWarn("post_order_tasks.whatsapp.direct_failed", {
+            ...logPayload,
+            error: result.error
+          });
+        }
+      } catch (error) {
+        logError("post_order_tasks.whatsapp.direct_exception", {
+          ...logPayload,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    } else {
+      logWarn("post_order_tasks.whatsapp.invalid_phone", { ...logPayload, phone: input.customerPhone });
+    }
+  } else {
+    logWarn("post_order_tasks.whatsapp.env_missing", logPayload);
   }
+
+  // Step 2: Email fallback — send if WhatsApp failed and email is configured
+  if (!whatsappSent && hasEmailEnv() && input.customerEmail) {
+    try {
+      const emailResult = await sendEmail({
+        to: input.customerEmail,
+        subject: `Order Confirmed — ${input.orderNumber}`,
+        html: buildOrderConfirmationEmailHtml({
+          customerName: input.customerName,
+          orderNumber: input.orderNumber,
+          items: input.items,
+          total: input.total,
+          paymentMethod: input.paymentMethod,
+          shippingAddress: input.shippingAddress
+        })
+      });
+      if (emailResult.sent) {
+        logInfo("post_order_tasks.email.fallback_sent", logPayload);
+      } else {
+        logWarn("post_order_tasks.email.fallback_failed", { ...logPayload, error: emailResult.error });
+      }
+    } catch (emailError) {
+      logWarn("post_order_tasks.email.fallback_exception", { ...logPayload, error: emailError instanceof Error ? emailError.message : String(emailError) });
+    }
+  }
+
+  return { sent: whatsappSent };
 }
 
 async function enqueueInvoice(input: PostOrderTaskInput) {

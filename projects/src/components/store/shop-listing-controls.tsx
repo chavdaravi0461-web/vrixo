@@ -29,38 +29,37 @@ export function ShopListingControls({
     event.preventDefault();
     const params = new URLSearchParams(searchParams.toString());
     const trimmed = search.trim();
-    if (trimmed) {
-      params.set("search", trimmed);
-    } else {
-      params.delete("search");
-    }
+    if (trimmed) params.set("search", trimmed);
+    else params.delete("search");
     router.push(`/shop?${params.toString()}`);
   }
 
   return (
     <>
-      <div className="dc-shop-controls dc-glass p-3 md:p-4">
-        <div className="grid gap-3 lg:grid-cols-[1fr_220px_auto] lg:items-center">
+      <div className="glass-card" style={{ padding: "12px 16px" }}>
+        <div className="grid gap-3 lg:grid-cols-[1fr_200px_auto] lg:items-center">
           <form onSubmit={submitSearch} className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search shoes, watches, brands..."
-              className="dc-input h-11 pl-10"
+              className="h-11"
+              style={{ paddingLeft: "40px", background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" }}
             />
           </form>
           <ShopSort defaultValue={current.sort ?? ""} />
           <Button
             type="button"
             variant="outline"
-            className="h-11 rounded-full border-[#d9cbb8] lg:hidden"
+            className="h-11 lg:hidden"
             onClick={() => setFiltersOpen(true)}
+            style={{ border: "1px solid var(--border)", color: "var(--text-secondary)", background: "transparent" }}
           >
             <SlidersHorizontal className="mr-2 h-4 w-4" />
             Filters
           </Button>
-          <div className="hidden text-right text-sm font-bold text-[#6b6256] lg:block">
+          <div className="hidden text-right body-sm lg:block" style={{ color: "var(--text-muted)" }}>
             {productCount} of {totalCount} styles
           </div>
         </div>
@@ -68,26 +67,18 @@ export function ShopListingControls({
 
       {filtersOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            aria-label="Close filters"
-            className="absolute inset-0 bg-slate-950/45"
-            onClick={() => setFiltersOpen(false)}
-          />
-          <div className="dc-filter-sheet absolute bottom-0 left-0 right-0 max-h-[86vh] overflow-y-auto rounded-t-[28px] bg-white p-4 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
+          <button type="button" aria-label="Close filters" className="absolute inset-0" style={{ background: "rgba(0,0,0,.5)" }} onClick={() => setFiltersOpen(false)} />
+          <div style={{
+            position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "86vh", overflowY: "auto",
+            borderTopLeftRadius: "24px", borderTopRightRadius: "24px", background: "var(--bg-elevated)",
+            padding: "16px", boxShadow: "var(--shadow-elevated)"
+          }}>
+            <div className="flex items-center justify-between" style={{ marginBottom: "12px" }}>
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8a5a24]">
-                  Vrixo
-                </p>
-                <h2 className="text-xl font-black uppercase tracking-[0.04em] text-[#181510]">Filter products</h2>
+                <p className="eyebrow">Vrixo</p>
+                <h2 className="display-md" style={{ fontSize: "18px" }}>Filter products</h2>
               </div>
-              <button
-                type="button"
-                className="grid h-10 w-10 place-items-center rounded-full bg-[#f7f4ef]"
-                onClick={() => setFiltersOpen(false)}
-                aria-label="Close filters"
-              >
+              <button type="button" className="header-icon" onClick={() => setFiltersOpen(false)} aria-label="Close filters">
                 <X className="h-5 w-5" />
               </button>
             </div>

@@ -124,3 +124,47 @@ export function ProductActions({ product }: { product: Product }) {
     </div>
   );
 }
+
+export function StickyMobileBar({ product }: { product: Product }) {
+  const router = useRouter();
+  const addItem = useCartStore((state) => state.addItem);
+  const inStock = product.stock > 0;
+  const [size, setSize] = useState(product.sizes[0] ?? "");
+  const [color, setColor] = useState(product.colors[0] ?? "");
+
+  if (inStock) {
+    return (
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--border)] bg-[var(--bg-card)] p-3 shadow-lg md:hidden">
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <p className="text-sm font-semibold">{cleanProductTitle(product.title)}</p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>{product.price} — {inStock ? "In stock" : "Sold out"}</p>
+          </div>
+          <button
+            type="button"
+            className="hero-btn hero-btn-primary"
+            style={{ whiteSpace: "nowrap", fontSize: "13px", padding: "8px 20px" }}
+            onClick={() => {
+              addItem({
+                productId: product.id,
+                slug: product.slug,
+                title: product.title,
+                price: product.price,
+                image: normalizeProductImage(product.images[0]) ?? getFallbackProductImage(),
+                quantity: 1,
+                stock: product.stock,
+                selectedColor: color,
+                selectedSize: size || undefined
+              });
+              toast.success("Added to cart");
+            }}
+          >
+            <ShoppingBag className="mr-2 h-4 w-4" />
+            Add to cart
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}

@@ -5,9 +5,10 @@ import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route";
 import { hasServerSupabaseAdminEnv } from "@/lib/env/server";
 import { getIndianMobileLookupVariants, normalizeIndianMobileNumber } from "@/lib/phone";
 import { checkServerRateLimit } from "@/lib/rate-limit";
-import { tooManyRequests } from "@/lib/api-response";
+import { tooManyRequests, forbidden } from "@/lib/api-response";
 import { sanitizeRedirectPath } from "@/lib/safe-navigation";
 import { safeRoute } from "@/lib/safe-route";
+import { requireSameOrigin } from "@/lib/server/origin-check";
 
 const passwordLoginSchema = z.object({
   identifier: z.string().trim().min(3),
@@ -16,6 +17,8 @@ const passwordLoginSchema = z.object({
 });
 
 export const POST = safeRoute(async function POST(request: NextRequest) {
+  const originCheck = requireSameOrigin(request);
+  if (originCheck) return originCheck;
   const rateLimit = await checkServerRateLimit(request, { key: "login", limit: 8, windowMs: 60 * 1000 });
   if (!rateLimit.allowed) return tooManyRequests(rateLimit.retryAfter);
 

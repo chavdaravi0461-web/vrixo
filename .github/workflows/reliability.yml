@@ -1,0 +1,53 @@
+name: Reliability Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  reliability:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./projects
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: ./projects/package-lock.json
+
+      - run: npm ci
+
+      - name: Type Check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Reliability Tests
+        run: npm test
+
+      - name: Check safeRoute Coverage
+        run: |
+          UNGUARDED=$(grep -r "export async function" src/app/api/ --include="route.ts" -l || true)
+          if [ -n "$UNGUARDED" ]; then
+            echo "ERROR: Unguarded route handlers found (missing safeRoute):"
+            echo "$UNGUARDED"
+            exit 1
+          fi
+          echo "All route handlers are wrapped with safeRoute. ✓"
+
+      - name: Verify No Raw Throws
+        run: |
+          THROWS=$(grep -rn "throw new Error" src/app/api/payments/ src/app/api/razorpay/webhook/ --include="route.ts" || true)
+          if [ -n "$THROWS" ]; then
+            echo "WARNING: Raw throws found in payment routes (should be wrapped by safeRoute):"
+            echo "$THROWS"
+          fi
+          echo "Checked."

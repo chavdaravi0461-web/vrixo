@@ -1,0 +1,1 @@
+{"buildCommand":"npm run build","installCommand":"cd projects && npm install","framework":"nextjs","outputDirectory":"projects/.next","crons":[{"path":"/api/cron/notification-retry","schedule":"*/5 * * * *"},{"path":"/api/cron/abandoned-carts","schedule":"0 5 * * *"}]}

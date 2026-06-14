@@ -16,9 +16,9 @@ const PRODUCT_CACHE_TAGS = ["products"];
 const PRODUCT_DETAIL_SELECT =
   "id, slug, title, category, subcategory, brand, short_description, full_description, price, original_price, discount_percent, currency, stock, sku, sizes, colors, images, featured, bestseller, new_arrival, status, rating, review_count, specifications, created_at, updated_at";
 
-// Minimal SELECT for product listings (excludes full_description, specifications for faster load)
+// Minimal SELECT for product listings
 const PRODUCT_LIST_SELECT =
-  "id, slug, title, category, subcategory, brand, short_description, price, original_price, discount_percent, currency, stock, sizes, colors, images, featured, bestseller, new_arrival, rating, review_count";
+  "id, slug, title, category, subcategory, brand, short_description, price, original_price, discount_percent, currency, stock, sizes, colors, images, featured, bestseller, new_arrival, rating, review_count, specifications";
 
 
 export function mapProductRow(row: Record<string, unknown>): Product {
@@ -47,12 +47,13 @@ export function mapProductRow(row: Record<string, unknown>): Product {
     featured: Boolean(row.featured),
     bestseller: Boolean(row.bestseller),
     newArrival: Boolean(row.new_arrival),
-    highlighted: Boolean(row.highlighted),
+    highlighted: false,
     displaySections: getProductDisplaySections(row),
     status,
     rating: Number(row.rating ?? 0),
     reviewCount: Number(row.review_count ?? 0),
     specifications: (row.specifications as Record<string, string>) ?? {},
+    audience: extractAudience(row),
     createdAt: String(row.created_at ?? new Date().toISOString()),
     updatedAt: String(row.updated_at ?? new Date().toISOString())
   };
@@ -173,4 +174,11 @@ export async function invalidateProductCache(): Promise<void> {
 function normalizeStatus(value: unknown): Product["status"] {
   const status = String(value ?? "active").trim().toLowerCase();
   return status === "draft" || status === "archived" || status === "active" ? status : "active";
+}
+
+function extractAudience(row: Record<string, unknown>): "men" | "women" | "unisex" | undefined {
+  const specs = row.specifications as Record<string, string> | null | undefined;
+  const audience = specs?.audience ?? specs?.Audience;
+  if (audience === "men" || audience === "women" || audience === "unisex") return audience;
+  return undefined;
 }

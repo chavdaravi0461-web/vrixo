@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { ProductActions } from "@/components/store/product-actions";
+import { ProductActions, StickyMobileBar } from "@/components/store/product-actions";
 import { ProductGallery } from "@/components/store/product-gallery";
 import { ProductSection } from "@/components/store/product-section";
 import { ReviewsSection } from "@/components/store/reviews-section";
@@ -13,99 +13,57 @@ import { getProductBySlug, getRelatedProducts, getProducts } from "@/services/pr
 import { getReviewsByProductId } from "@/services/reviews";
 import type { Product } from "@/types/index";
 
-// Revalidate every 3600 seconds (1 hour) for product data freshness
 export const revalidate = 3600;
 
-// Generate static params for popular products at build time
 export async function generateStaticParams() {
   const allProducts = await getProducts();
-  // Pre-render top 50 products for instant loading, rest on-demand
-  return allProducts.slice(0, 50).map((product) => ({
-    slug: product.slug
-  }));
+  return allProducts.map((product) => ({ slug: product.slug }));
 }
 
-export async function generateMetadata({
-  params
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-
-  if (!product) {
-    return buildMetadata("Product not found");
-  }
-
+  if (!product) return buildMetadata("Product not found");
   const primaryImage = product.images[0] ?? getFallbackProductImage();
   const appUrl = getAppUrl();
   const imageUrl = primaryImage.startsWith("/") ? `${appUrl}${primaryImage}` : primaryImage;
-
   return {
     title: `${cleanProductTitle(product.title)} | Vrixo`,
     description: product.shortDescription || "Premium shoes and watches by Vrixo",
-    openGraph: {
-      title: cleanProductTitle(product.title),
-      description: product.shortDescription,
-      url: `${appUrl}/product/${slug}`,
-      siteName: "Vrixo",
-      images: [{ url: imageUrl }],
-      type: "article"
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: cleanProductTitle(product.title),
-      description: product.shortDescription,
-      images: [imageUrl]
-    },
-    alternates: {
-      canonical: `${appUrl}/product/${slug}`
-    }
+    openGraph: { title: cleanProductTitle(product.title), description: product.shortDescription, url: `${appUrl}/product/${slug}`, siteName: "Vrixo", images: [{ url: imageUrl }], type: "website" },
+    twitter: { card: "summary_large_image", title: cleanProductTitle(product.title), description: product.shortDescription, images: [imageUrl] },
+    alternates: { canonical: `${appUrl}/product/${slug}` }
   };
 }
 
-export default async function ProductPage({
-  params
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-
-  if (!product) {
-    notFound();
-  }
+  if (!product) notFound();
 
   const related = await getRelatedProducts(product);
   const reviews = await getReviewsByProductId(product.id);
   const displayTitle = cleanProductTitle(product.title);
   const displayDescription = cleanProductDescription(product.fullDescription);
-  const productImages = product.images
-    .map((image) => normalizeProductImage(image))
-    .filter((image): image is string => Boolean(image));
+  const productImages = product.images.map((image) => normalizeProductImage(image)).filter((image): image is string => Boolean(image));
   const primaryImage = productImages[0] ?? getFallbackProductImage();
   const appUrl = getAppUrl();
   const productUrl = `${appUrl}/product/${slug}`;
-  const schemaImages = (productImages.length > 0 ? productImages : [primaryImage]).map((image) =>
-    image.startsWith("/") ? `${appUrl}${image}` : image
-  );
+  const schemaImages = (productImages.length > 0 ? productImages : [primaryImage]).map((image) => image.startsWith("/") ? `${appUrl}${image}` : image);
 
-  // JSON-LD schema for product
   const productSchema = {
     "@context": "https://schema.org/",
     "@type": "Product",
+    "@id": productUrl,
     name: displayTitle,
     image: schemaImages,
     description: product.shortDescription,
     sku: product.sku || product.slug,
     category: product.category,
-    brand: {
-      "@type": "Brand",
-      name: "Vrixo"
-    },
+    brand: { "@type": "Brand", name: "Vrixo" },
     offers: {
       "@type": "Offer",
-      price: product.price.toString(),
+      price: product.price,
       priceCurrency: product.currency,
       availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       itemCondition: "https://schema.org/NewCondition",
@@ -118,112 +76,106 @@ export default async function ProductPage({
     } : undefined
   };
 
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: appUrl },
+      { "@type": "ListItem", position: 2, name: product.category || "Shop", item: `${appUrl}/shop?category=${product.category?.toLowerCase() || ""}` },
+      { "@type": "ListItem", position: 3, name: displayTitle }
+    ]
+  };
+
+  const stockLabel = product.stock > 10 ? "In stock" : product.stock > 0 ? `Only ${product.stock} left in stock` : "Sold out";
+
   return (
     <>
       <RecentlyViewedTracker slug={slug} />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
-      />
-      <section className="dc-container dc-pdp-shell mt-6">
-        <div className="dc-glass dc-glass-edge dc-pdp-layout grid gap-5 p-4 lg:grid-cols-[1fr_0.95fr] lg:p-6">
-          <ProductGallery images={productImages.length > 0 ? productImages : [primaryImage]} title={displayTitle} colors={product.colors} />
-          <div className="dc-pdp-info p-2">
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--dc-gold)]">{product.brand || product.category}</p>
-            <h1 className="mt-2 text-3xl font-black leading-tight text-[var(--dc-heading)] md:text-5xl">{displayTitle}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-700 px-3 py-1 text-sm font-bold text-white">
-                {product.rating.toFixed(1)} <Star className="h-3.5 w-3.5 fill-white" />
-              </span>
-              <span className="text-sm font-semibold text-[var(--dc-muted)]">{product.reviewCount} ratings</span>
-              <span className="text-sm font-semibold text-green-700">Extra offers available</span>
-            </div>
-            <div className="mt-5 flex flex-wrap items-end gap-3">
-              <p className="text-4xl font-black text-[var(--dc-heading)]">{formatCurrency(product.price)}</p>
-              <p className="pb-1 text-lg text-[var(--dc-muted-2)] line-through">
-                {formatCurrency(product.originalPrice)}
-              </p>
-              {product.discountPercent > 0 ? (
-                <p className="pb-1 text-lg font-black text-[var(--dc-danger)]">{product.discountPercent}% off</p>
-              ) : null}
-            </div>
-            <p className="mt-3 text-sm leading-7 text-[var(--dc-muted)]">{displayDescription}</p>
-            <div className="dc-pdp-info-chips mt-5 grid gap-3 text-sm text-[var(--dc-text)] sm:grid-cols-3">
-              <InfoChip icon={Truck} label="Delivery" value="Fast dispatch" />
-              <InfoChip icon={ShieldCheck} label="Availability" value={product.stock > 0 ? "Ready to ship" : "Sold out"} />
-              <InfoChip icon={BadgePercent} label="Checkout" value="COD and online" />
-            </div>
-            <ProductConfidencePanel />
-            <ProductActions product={product} />
-            <div className="mt-8 border-t border-[var(--dc-border)] pt-6">
-              <ProductDetailsAccordions
-                description={displayDescription}
-                stock={product.stock}
-                specifications={product.specifications}
-              />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
+      <section className="section" style={{ paddingTop: "24px" }}>
+        <div className="container">
+          <div className="glass-card" style={{ padding: "16px" }}>
+            <div className="grid gap-6 lg:grid-cols-[1fr_0.95fr] lg:p-2">
+              <ProductGallery images={productImages.length > 0 ? productImages : [primaryImage]} title={displayTitle} colors={product.colors} />
+              <div style={{ padding: "8px" }}>
+                <p className="eyebrow" style={{ marginBottom: "8px" }}>{product.brand || product.category}</p>
+                <h1 className="display-lg" style={{ letterSpacing: "-.025em", lineHeight: 1.1 }}>{displayTitle}</h1>
+                <div className="flex flex-wrap items-center gap-3" style={{ marginTop: "12px" }}>
+                  <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-semibold" style={{ background: "var(--bg-elevated)", color: "var(--accent)" }}>
+                    {product.rating.toFixed(1)} <Star className="h-3.5 w-3.5 fill-[var(--accent)]" />
+                  </span>
+                  <span className="body-sm">{product.reviewCount} ratings</span>
+                </div>
+                <div className="flex flex-wrap items-end gap-3" style={{ marginTop: "20px" }}>
+                  <p className="display-md" style={{ fontWeight: 700 }}>{formatCurrency(product.price)}</p>
+                  <p className="body-sm" style={{ textDecoration: "line-through", paddingBottom: "2px" }}>{formatCurrency(product.originalPrice)}</p>
+                  {product.discountPercent > 0 ? (
+                    <p className="body-sm" style={{ color: "rgba(255,80,80,.8)", fontWeight: 600 }}>{product.discountPercent}% off</p>
+                  ) : null}
+                </div>
+                <p className="body" style={{ marginTop: "12px", lineHeight: 1.7, color: "var(--text-muted)" }}>{displayDescription}</p>
+                {product.stock > 0 && product.stock <= 5 ? (
+                  <p className="body-sm" style={{ marginTop: "12px", color: "rgba(255,80,80,.8)", fontWeight: 600 }}>Only {product.stock} left in stock — order soon</p>
+                ) : null}
+                <div className="grid gap-3 sm:grid-cols-3" style={{ marginTop: "20px" }}>
+                  <InfoChip icon={Truck} label="Delivery" value="Fast dispatch" />
+                  <InfoChip icon={ShieldCheck} label="Availability" value={stockLabel} />
+                  <InfoChip icon={BadgePercent} label="Checkout" value="COD and online" />
+                </div>
+                <ProductConfidencePanel />
+                <ProductActions product={product} />
+                <div style={{ borderTop: "1px solid var(--border)", marginTop: "32px", paddingTop: "24px" }}>
+                  <ProductDetailsAccordions description={displayDescription} stock={product.stock} specifications={product.specifications} />
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
       <FrequentlyBoughtTogether product={product} related={related.slice(0, 2)} />
-      <ProductSection
-        eyebrow="Related picks"
-        title="Similar products"
-        description="More choices from the same category."
-        products={related}
-      />
+      <ProductSection eyebrow="Related picks" title="Similar products" description="More choices from the same category." products={related} />
       <ReviewsSection productId={product.id} reviews={reviews} />
+      <StickyMobileBar product={product} />
     </>
   );
 }
 
-function ProductDetailsAccordions({
-  description,
-  stock,
-  specifications
-}: {
-  description: string;
-  stock: number;
-  specifications: Record<string, string>;
-}) {
+function ProductDetailsAccordions({ description, stock, specifications }: { description: string; stock: number; specifications: Record<string, string> }) {
   const specificationEntries = Object.entries(specifications);
-
   return (
-    <div className="divide-y divide-[var(--dc-border)] border-y border-[var(--dc-border)]">
+    <div style={{ borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
       <details className="group" open>
-        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-black uppercase tracking-[0.12em] text-[var(--dc-heading)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-medium tracking-[.06em]" style={{ textTransform: "uppercase", color: "var(--text)", letterSpacing: ".06em" }}>
           Product Details
-          <span className="text-xl leading-none text-[var(--dc-gold)] group-open:rotate-45">+</span>
+          <span className="text-lg leading-none transition-transform duration-200 group-open:rotate-45" style={{ color: "var(--text-muted)" }}>+</span>
         </summary>
-        <p className="pb-5 text-sm leading-7 text-[var(--dc-muted)]">{description}</p>
+        <p className="body-sm" style={{ paddingBottom: "20px" }}>{description}</p>
       </details>
       <details className="group">
-        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-black uppercase tracking-[0.12em] text-[var(--dc-heading)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-medium tracking-[.06em]" style={{ textTransform: "uppercase", color: "var(--text)", letterSpacing: ".06em" }}>
           Specifications
-          <span className="text-xl leading-none text-[var(--dc-gold)] group-open:rotate-45">+</span>
+          <span className="text-lg leading-none transition-transform duration-200 group-open:rotate-45" style={{ color: "var(--text-muted)" }}>+</span>
         </summary>
-        <div className="grid gap-3 pb-5">
-          {specificationEntries.length > 0 ? (
-            specificationEntries.map(([key, value]) => (
-              <div key={key} className="flex items-center justify-between gap-4 text-sm">
-                <span className="font-medium text-[var(--dc-muted)]">{key}</span>
-                <span className="text-right font-semibold text-[var(--dc-heading)]">{value}</span>
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-[var(--dc-muted)]">Premium Vrixo selection with careful quality checks.</p>
-          )}
+        <div className="grid gap-3" style={{ paddingBottom: "20px" }}>
+          {specificationEntries.length > 0 ? specificationEntries.map(([key, value]) => (
+            <div key={key} className="flex items-center justify-between gap-4 text-sm">
+              <span style={{ color: "var(--text-muted)" }}>{key}</span>
+              <span style={{ color: "var(--text)", fontWeight: 500 }}>{value}</span>
+            </div>
+          )) : <p className="body-sm">Premium Vrixo selection with careful quality checks.</p>}
         </div>
       </details>
       <details className="group">
-        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-black uppercase tracking-[0.12em] text-[var(--dc-heading)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-medium tracking-[.06em]" style={{ textTransform: "uppercase", color: "var(--text)", letterSpacing: ".06em" }}>
           Delivery & Returns
-          <span className="text-xl leading-none text-[var(--dc-gold)] group-open:rotate-45">+</span>
+          <span className="text-lg leading-none transition-transform duration-200 group-open:rotate-45" style={{ color: "var(--text-muted)" }}>+</span>
         </summary>
-        <div className="grid gap-3 pb-5 text-sm leading-7 text-[var(--dc-muted)]">
-          <p>Cash on Delivery and secure online payment are available at checkout.</p>
+        <div className="grid gap-3 body-sm" style={{ paddingBottom: "20px" }}>
+          <p><strong>Delivery:</strong> Fast dispatch within 1–2 business days. Free delivery on eligible orders.</p>
+          <p><strong>Returns:</strong> Easy 7-day return policy. Items must be unworn with tags intact. Contact support to initiate.</p>
+          <p><strong>Payments:</strong> Cash on Delivery (COD) and secure online payments via Razorpay (UPI, cards, netbanking).</p>
           <p>{stock > 0 ? "Currently available for dispatch." : "This product is currently out of stock."}</p>
-          <p>For returns and delivery support, review Vrixo policies from the footer links.</p>
         </div>
       </details>
     </div>
@@ -233,16 +185,15 @@ function ProductDetailsAccordions({
 function ProductConfidencePanel() {
   const items = [
     { icon: ShieldCheck, label: "Razorpay secure checkout" },
-    { icon: Truck, label: "COD available on eligible orders" },
+    { icon: Truck, label: "Free delivery on eligible orders" },
     { icon: BadgeCheck, label: "Genuine Vrixo selection" },
-    { icon: PackageCheck, label: "Careful packing before dispatch" }
+    { icon: PackageCheck, label: "7-day easy returns" }
   ];
-
   return (
-    <div className="dc-product-proof mt-5 grid gap-2 sm:grid-cols-2">
+    <div className="grid gap-2 sm:grid-cols-2" style={{ marginTop: "20px" }}>
       {items.map((item) => (
-        <div key={item.label} className="flex items-center gap-2 text-xs font-bold text-[var(--dc-muted)]">
-          <item.icon className="h-4 w-4 text-[var(--dc-gold)]" />
+        <div key={item.label} className="flex items-center gap-2 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+          <item.icon className="h-4 w-4" style={{ color: "var(--accent)" }} />
           <span>{item.label}</span>
         </div>
       ))}
@@ -250,48 +201,32 @@ function ProductConfidencePanel() {
   );
 }
 
-function FrequentlyBoughtTogether({
-  product,
-  related
-}: {
-  product: Product;
-  related: Product[];
-}) {
-  if (related.length === 0) {
-    return null;
-  }
-
+function FrequentlyBoughtTogether({ product, related }: { product: Product; related: Product[] }) {
+  if (related.length === 0) return null;
   const total = related.reduce((sum, item) => sum + item.price, product.price);
-
   return (
-    <section className="dc-container mt-8">
-      <div className="dc-glass dc-glass-edge dc-style-bundle rounded-[var(--dc-radius-lg)] p-6">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--dc-gold)]">
-            Frequently styled together
-          </p>
-          <h2 className="mt-2 text-3xl font-black leading-tight text-[var(--dc-heading)]">
-            Build a complete Vrixo look
-          </h2>
-          <p className="mt-2 text-sm leading-7 text-[var(--dc-muted)]">
-            Pair this product with related picks for a sharper outfit-ready purchase.
-          </p>
-        </div>
-        <div className="dc-style-bundle-list grid gap-3">
-          {[product, ...related].map((item) => (
-            <div key={item.id} className="flex items-center justify-between gap-4 rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] bg-[var(--dc-surface)] p-4">
-              <div>
-                <p className="font-black text-[var(--dc-heading)]">{cleanProductTitle(item.title)}</p>
-                <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--dc-muted)]">
-                  {item.brand || item.category}
-                </p>
+    <section className="section" style={{ paddingTop: "24px" }}>
+      <div className="container">
+        <div className="glass-card" style={{ padding: "24px" }}>
+          <div>
+            <p className="eyebrow">Frequently styled together</p>
+            <h2 className="display-md" style={{ marginTop: "8px", marginBottom: "4px" }}>Build a complete Vrixo look</h2>
+            <p className="body">Pair this product with related picks for a sharper outfit-ready purchase.</p>
+          </div>
+          <div className="grid gap-3" style={{ marginTop: "20px" }}>
+            {[product, ...related].map((item) => (
+              <div key={item.id} className="flex items-center justify-between gap-4 rounded-[var(--radius-sm)] p-4" style={{ border: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
+                <div>
+                  <p style={{ fontWeight: 500, color: "var(--text)" }}>{cleanProductTitle(item.title)}</p>
+                  <p className="eyebrow" style={{ marginTop: "4px" }}>{item.brand || item.category}</p>
+                </div>
+                <p className="p-card-price">{formatCurrency(item.price)}</p>
               </div>
-              <p className="shrink-0 font-black text-[var(--dc-heading)]">{formatCurrency(item.price)}</p>
+            ))}
+            <div className="flex items-center justify-between rounded-[var(--radius-sm)] p-4" style={{ background: "var(--bg-card)" }}>
+              <span className="body-sm">Style bundle value</span>
+              <strong className="display-md" style={{ fontSize: "18px" }}>{formatCurrency(total)}</strong>
             </div>
-          ))}
-          <div className="flex items-center justify-between rounded-[var(--dc-radius-md)] bg-[var(--dc-bg-deep)] p-4 text-[var(--dc-heading)]">
-            <span className="text-sm font-bold text-[var(--dc-muted)]">Style bundle value</span>
-            <strong className="text-xl">{formatCurrency(total)}</strong>
           </div>
         </div>
       </div>
@@ -299,21 +234,13 @@ function FrequentlyBoughtTogether({
   );
 }
 
-function InfoChip({
-  icon: Icon,
-  label,
-  value
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
+function InfoChip({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-[var(--dc-radius-md)] border border-[var(--dc-border)] bg-[var(--dc-surface)] p-3">
-      <Icon className="h-5 w-5 text-[var(--dc-gold)]" />
+    <div className="flex items-center gap-3 rounded-[var(--radius-sm)] p-3" style={{ border: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
+      <Icon className="h-5 w-5" style={{ color: "var(--accent)" }} />
       <div>
-        <p className="text-xs font-semibold text-[var(--dc-muted)]">{label}</p>
-        <p className="font-bold text-[var(--dc-heading)]">{value}</p>
+        <p className="body-sm" style={{ fontSize: "11px" }}>{label}</p>
+        <p style={{ fontSize: "13px", fontWeight: 500, color: "var(--text)" }}>{value}</p>
       </div>
     </div>
   );

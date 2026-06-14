@@ -4,6 +4,7 @@ import { z } from "zod";
 import { sendOrderConfirmationSms } from "@/lib/sms";
 import { sendOrderConfirmationWhatsApp } from "@/lib/whatsapp";
 import { formatWhatsAppPhone } from "@/lib/whatsapp/phone";
+import { logInfo, logWarn, logError } from "@/lib/observability";
 
 export type NotificationProvider = "sms" | "whatsapp";
 export type NotificationEventType = "order_confirmation" | "delivery_update" | "admin_alert";
@@ -157,9 +158,21 @@ async function dispatchClaimedNotification(
   supabase: SupabaseClient,
   notification: ClaimedNotification
 ): Promise<NotificationResult> {
+  logInfo("notification.queue.dispatch_claimed", {
+    notificationId: notification.id,
+    orderId: notification.order_id,
+    provider: notification.provider,
+    eventType: notification.event_type,
+    attempt: notification.attempts
+  });
+
   const parsedPayload = notificationPayloadSchema.safeParse(notification.payload);
   if (!parsedPayload.success) {
     const error = parsedPayload.error.issues.map((issue) => issue.message).join(" ");
+    logWarn("notification.queue.invalid_payload", {
+      notificationId: notification.id,
+      error
+    });
     return completeNotification(supabase, notification, {
       sent: false,
       error: `Invalid notification payload: ${error}`,
@@ -169,6 +182,11 @@ async function dispatchClaimedNotification(
 
   const payload = parsedPayload.data;
   if (!formatWhatsAppPhone(payload.customerPhone) && notification.provider === "whatsapp") {
+    logWarn("notification.queue.invalid_phone", {
+      notificationId: notification.id,
+      orderId: notification.order_id,
+      phoneSuffix: payload.customerPhone.slice(-4)
+    });
     return completeNotification(supabase, notification, {
       sent: false,
       error: "Invalid customer WhatsApp number.",
@@ -179,6 +197,10 @@ async function dispatchClaimedNotification(
   let result: NotificationResult;
   try {
     if (notification.provider === "sms") {
+      logInfo("notification.queue.sending_sms", {
+        notificationId: notification.id,
+        orderId: notification.order_id
+      });
       const smsResult = await sendOrderConfirmationSms({
         customerName: payload.customerName,
         phone: payload.customerPhone,
@@ -195,10 +217,22 @@ async function dispatchClaimedNotification(
         response: smsResult
       };
     } else {
+      logInfo("notification.queue.sending_whatsapp", {
+        notificationId: notification.id,
+        orderId: notification.order_id,
+        phoneSuffix: payload.customerPhone.slice(-4)
+      });
       const whatsappResult = await sendOrderConfirmationWhatsApp({
         ...payload,
         deliveryAddress: formatDeliveryAddress(payload.deliveryAddress),
         productImageUrl: payload.productImageUrl ?? ""
+      });
+      logInfo("notification.queue.whatsapp_result", {
+        notificationId: notification.id,
+        sent: whatsappResult.sent,
+        error: whatsappResult.error,
+        adminNotified: whatsappResult.adminNotified,
+        customerMessageId: whatsappResult.customerMessageId
       });
       result = {
         sent: whatsappResult.sent,
@@ -210,9 +244,15 @@ async function dispatchClaimedNotification(
       };
     }
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logError("notification.queue.dispatch_error", {
+      notificationId: notification.id,
+      error: errorMsg,
+      provider: notification.provider
+    });
     result = {
       sent: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMsg,
       attempts: notification.attempts
     };
   }

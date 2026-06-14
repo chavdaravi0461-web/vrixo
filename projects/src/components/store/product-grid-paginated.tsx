@@ -19,7 +19,7 @@ export function ProductGridPaginated({ products }: { products: Product[] }) {
           <button
             type="button"
             onClick={() => setPage((p) => p + 1)}
-            className="dc-btn-luxe dc-btn-luxe-primary"
+            className="hero-btn hero-btn-ghost"
           >
             Load more ({products.length - shown.length} remaining)
           </button>

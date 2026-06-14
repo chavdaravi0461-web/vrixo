@@ -16,7 +16,7 @@ const ALLOWED_REDIRECT_PREFIXES = [
 
 export function sanitizeRedirectPath(
   path: string | null | undefined,
-  fallback = "/account"
+  fallback = "/shop"
 ): string {
   if (!path) {
     return fallback;

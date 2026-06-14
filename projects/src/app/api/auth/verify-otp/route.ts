@@ -51,7 +51,7 @@ export const POST = safeRoute(async function POST(request: NextRequest) {
 
   const response = NextResponse.json({
     success: true,
-    redirectTo: "/account"
+    redirectTo: "/shop"
   });
 
   const routeSupabase = createRouteHandlerSupabaseClient(request, response);

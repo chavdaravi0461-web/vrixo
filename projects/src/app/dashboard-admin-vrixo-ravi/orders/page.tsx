@@ -55,19 +55,7 @@ export default async function AdminOrdersPage({
   const { data: orders, count } = await query.range(from, to);
 
   return (
-    <AdminShell current="/dashboard-admin-vrixo-ravi/orders">
-      <section className="os-hero mb-6 p-5 md:p-6">
-        <div className="relative z-10">
-          <div className="flex items-center gap-2">
-            <span className="os-dot live" />
-            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-[var(--os-text-3)]">Fulfillment Desk</span>
-          </div>
-          <h1 className="mt-3 text-2xl font-bold text-white md:text-3xl tracking-tight">Manage Orders</h1>
-          <p className="mt-1 max-w-xl text-sm text-[var(--os-text-3)]">
-            Search orders, review customer details, verify payment state, and move shipments through the daily workflow.
-          </p>
-        </div>
-      </section>
+    <AdminShell>
       <OrdersAdminClient
         orders={orders ?? []}
         pagination={{ page, limit, total: count ?? 0 }}

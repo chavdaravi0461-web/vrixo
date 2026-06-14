@@ -40,7 +40,7 @@ export default async function EnterprisePage() {
     .reduce((sum, order) => sum + Number(order.total ?? 0), 0);
 
   return (
-    <AdminShell current="/dashboard-admin-vrixo-ravi/enterprise">
+    <AdminShell>
       <EnterpriseCommandCenter
         initial={{
           health: {

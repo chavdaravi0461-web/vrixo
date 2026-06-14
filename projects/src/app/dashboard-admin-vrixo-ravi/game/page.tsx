@@ -27,7 +27,7 @@ export default async function AdminGamePage() {
   const usedCoupons = coupons?.filter((c) => c.used).length ?? 0;
 
   return (
-    <AdminShell current="/dashboard-admin-vrixo-ravi/game">
+    <AdminShell>
       <section className="os-hero p-5 md:p-6">
         <div className="relative z-10">
           <div className="flex items-center gap-2">

@@ -28,7 +28,7 @@ export const POST = safeRoute(async function POST(request: Request) {
   } = await authSupabase.auth.getUser();
   const result = await validateCouponForCheckout({
     supabase: createAdminClient(),
-    code: body.code,
+    code: body.code.toUpperCase().trim(),
     subtotal,
     userId: user?.id ?? null
   });

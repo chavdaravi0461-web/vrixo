@@ -61,49 +61,44 @@ export default async function AdminAnalyticsPage() {
   const analytics = buildAnalytics(orders);
 
   return (
-    <AdminShell current="/dashboard-admin-vrixo-ravi/analytics">
-      <section className="os-hero p-5 md:p-6">
-        <div className="relative z-10">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="os-dot live" />
-                <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-[var(--os-text-3)]">Sales Intelligence</span>
-              </div>
-              <h1 className="mt-3 text-2xl font-bold text-white md:text-3xl tracking-tight">Analytics</h1>
-              <p className="mt-1 max-w-xl text-sm text-[var(--os-text-3)]">
-                Revenue, payment health, fulfillment pressure, and product winners from the latest 1,000 orders.
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <HeroMetric label="Today" value={money(analytics.todayRevenue)} />
-              <HeroMetric label="30 day" value={money(analytics.last30Revenue)} />
-              <HeroMetric label="AOV" value={money(analytics.averageOrderValue)} />
-            </div>
+    <AdminShell>
+      <section className="cos-section">
+        <div className="cos-section-header">
+          <div>
+            <div className="cos-section-eyebrow">Sales Intelligence</div>
+            <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Analytics</h2>
+            <p style={{ fontSize: "12px", color: "var(--cos-text-tertiary)", marginTop: "4px", maxWidth: "480px" }}>
+              Revenue, payment health, fulfillment pressure, and product winners from the latest 1,000 orders.
+            </p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
+            <HeroMetric label="Today" value={money(analytics.todayRevenue)} />
+            <HeroMetric label="30 day" value={money(analytics.last30Revenue)} />
+            <HeroMetric label="AOV" value={money(analytics.averageOrderValue)} />
           </div>
         </div>
       </section>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric icon={BadgeIndianRupee} label="Net Sales" value={money(analytics.netRevenue)} hint={`${analytics.saleOrders} orders`} color="indigo" />
-        <Metric icon={TrendingUp} label="30 Day Growth" value={percent(analytics.growthRate)} hint={`${money(analytics.previous30Revenue)} prev 30d`} up={analytics.growthRate >= 0} color="emerald" />
-        <Metric icon={ShoppingBag} label="Orders Today" value={analytics.todayOrders} hint={`${analytics.pendingOrders} pending`} up={false} color="rose" />
-        <Metric icon={Target} label="Avg Order Value" value={money(analytics.averageOrderValue)} hint={`${money(analytics.bestOrderTotal)} highest`} color="violet" />
-        <Metric icon={CreditCard} label="Online Paid" value={analytics.paidOrders} hint={money(analytics.onlinePaidRevenue)} color="emerald" />
-        <Metric icon={Banknote} label="COD Load" value={analytics.codOrders} hint={money(analytics.codRevenue)} color="amber" />
-        <Metric icon={Truck} label="In Fulfillment" value={analytics.fulfillmentOrders} hint="Processing, packed, shipped" color="sky" />
-        <Metric icon={AlertTriangle} label="At Risk" value={analytics.riskOrders} hint={`${money(analytics.riskRevenue)} exposed`} up={false} color="rose" />
+      <div className="cos-metrics-strip" style={{ marginTop: "16px" }}>
+        <Metric icon={BadgeIndianRupee} label="Net Sales" value={money(analytics.netRevenue)} hint={`${analytics.saleOrders} orders`} />
+        <Metric icon={TrendingUp} label="30 Day Growth" value={percent(analytics.growthRate)} hint={`${money(analytics.previous30Revenue)} prev 30d`} up={analytics.growthRate >= 0} />
+        <Metric icon={ShoppingBag} label="Orders Today" value={analytics.todayOrders} hint={`${analytics.pendingOrders} pending`} />
+        <Metric icon={Target} label="Avg Order Value" value={money(analytics.averageOrderValue)} hint={`${money(analytics.bestOrderTotal)} highest`} />
+        <Metric icon={CreditCard} label="Online Paid" value={analytics.paidOrders} hint={money(analytics.onlinePaidRevenue)} />
+        <Metric icon={Banknote} label="COD Load" value={analytics.codOrders} hint={money(analytics.codRevenue)} />
+        <Metric icon={Truck} label="In Fulfillment" value={analytics.fulfillmentOrders} hint="Processing, packed, shipped" />
+        <Metric icon={AlertTriangle} label="At Risk" value={analytics.riskOrders} hint={`${money(analytics.riskRevenue)} exposed`} />
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
-        <div className="os-card">
-          <div className="os-card-header">
+      <div className="cos-grid-2" style={{ marginTop: "16px" }}>
+        <div className="cos-section">
+          <div className="cos-section-header">
             <div>
-              <h3>14 Day Sales Pulse</h3>
-              <p>Daily order volume and revenue trend</p>
+              <h3 style={{ fontSize: "14px", fontWeight: 700 }}>14 Day Sales Pulse</h3>
+              <p style={{ fontSize: "11px", color: "var(--cos-text-tertiary)", marginTop: "2px" }}>Daily order volume and revenue trend</p>
             </div>
           </div>
-          <div className="grid gap-4 p-5">
+          <div style={{ display: "grid", gap: "10px", padding: "16px" }}>
             {analytics.dailyTrend.map((day) => (
               <TrendRow
                 key={day.key}
@@ -116,56 +111,38 @@ export default async function AdminAnalyticsPage() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-5">
-          <div className="os-card">
-            <div className="os-card-header">
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div className="cos-section">
+            <div className="cos-section-header">
               <div>
-                <h3>Control Tower</h3>
-                <p>Signals needing attention</p>
+                <h3 style={{ fontSize: "14px", fontWeight: 700 }}>Control Tower</h3>
+                <p style={{ fontSize: "11px", color: "var(--cos-text-tertiary)", marginTop: "2px" }}>Signals needing attention</p>
               </div>
             </div>
-            <div className="grid gap-3 p-4">
-              <SignalCard
-                icon={AlertTriangle}
-                title="Pending Order Value"
-                value={money(analytics.pendingRevenue)}
-                description={`${analytics.pendingOrders} orders need confirmation.`}
-                href="/dashboard-admin-vrixo-ravi/orders?order_status=pending"
-              />
-              <SignalCard
-                icon={CreditCard}
-                title="Failed Payment Value"
-                value={money(analytics.failedPaymentRevenue)}
-                description={`${analytics.failedPaymentOrders} failed payments.`}
-                href="/dashboard-admin-vrixo-ravi/orders?payment_status=failed"
-              />
-              <SignalCard
-                icon={CheckCircle2}
-                title="Delivered Revenue"
-                value={money(analytics.deliveredRevenue)}
-                description={`${analytics.deliveredOrders} completed.`}
-                href="/dashboard-admin-vrixo-ravi/orders?order_status=delivered"
-              />
+            <div style={{ display: "grid", gap: "8px", padding: "12px" }}>
+              <SignalCard icon={AlertTriangle} title="Pending Order Value" value={money(analytics.pendingRevenue)} description={`${analytics.pendingOrders} orders need confirmation.`} href="/dashboard-admin-vrixo-ravi/orders?order_status=pending" />
+              <SignalCard icon={CreditCard} title="Failed Payment Value" value={money(analytics.failedPaymentRevenue)} description={`${analytics.failedPaymentOrders} failed payments.`} href="/dashboard-admin-vrixo-ravi/orders?payment_status=failed" />
+              <SignalCard icon={CheckCircle2} title="Delivered Revenue" value={money(analytics.deliveredRevenue)} description={`${analytics.deliveredOrders} completed.`} href="/dashboard-admin-vrixo-ravi/orders?order_status=delivered" />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-3">
+      <div className="cos-grid-2" style={{ marginTop: "16px", gridTemplateColumns: "1fr 1fr 1fr" }}>
         <BreakdownPanel title="Payment Mix" rows={analytics.paymentMix} />
         <BreakdownPanel title="Order Status" rows={analytics.statusMix} />
         <BreakdownPanel title="Top Delivery Cities" rows={analytics.cityMix} emptyText="No city data yet." />
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-2">
-        <div className="os-card">
-          <div className="os-card-header">
+      <div className="cos-grid-2" style={{ marginTop: "16px" }}>
+        <div className="cos-section">
+          <div className="cos-section-header">
             <div>
-              <h3>Best Selling Products</h3>
-              <p>Ranked by quantity sold</p>
+              <h3 style={{ fontSize: "14px", fontWeight: 700 }}>Best Selling Products</h3>
+              <p style={{ fontSize: "11px", color: "var(--cos-text-tertiary)", marginTop: "2px" }}>Ranked by quantity sold</p>
             </div>
           </div>
-          <div className="divide-y divide-[var(--os-border)]">
+          <div>
             {analytics.topProducts.length ? (
               analytics.topProducts.map((product, i) => (
                 <RankRow key={product.key} rank={i + 1} title={product.title} meta={`${product.quantity} sold`} value={money(product.revenue)} icon={Package} />
@@ -176,14 +153,14 @@ export default async function AdminAnalyticsPage() {
           </div>
         </div>
 
-        <div className="os-card">
-          <div className="os-card-header">
+        <div className="cos-section">
+          <div className="cos-section-header">
             <div>
-              <h3>Top Customers</h3>
-              <p>Repeat buyers and high value</p>
+              <h3 style={{ fontSize: "14px", fontWeight: 700 }}>Top Customers</h3>
+              <p style={{ fontSize: "11px", color: "var(--cos-text-tertiary)", marginTop: "2px" }}>Repeat buyers and high value</p>
             </div>
           </div>
-          <div className="divide-y divide-[var(--os-border)]">
+          <div>
             {analytics.topCustomers.length ? (
               analytics.topCustomers.map((customer, i) => (
                 <RankRow key={customer.key} rank={i + 1} title={customer.name} meta={`${customer.orders} orders`} value={money(customer.revenue)} icon={Users} />
@@ -195,29 +172,29 @@ export default async function AdminAnalyticsPage() {
         </div>
       </div>
 
-      <div className="mt-5 os-card">
-        <div className="os-card-header">
+      <div className="cos-section" style={{ marginTop: "16px" }}>
+        <div className="cos-section-header">
           <div>
-            <h3>Latest High Value Orders</h3>
-            <p>Recent orders by highest totals</p>
+            <h3 style={{ fontSize: "14px", fontWeight: 700 }}>Latest High Value Orders</h3>
+            <p style={{ fontSize: "11px", color: "var(--cos-text-tertiary)", marginTop: "2px" }}>Recent orders by highest totals</p>
           </div>
-          <Link href="/dashboard-admin-vrixo-ravi/orders" className="os-btn os-btn-ghost" style={{ padding: "4px 10px", fontSize: "10px" }}>
-            View All <ArrowRight className="h-3 w-3" />
+          <Link href="/dashboard-admin-vrixo-ravi/orders" className="cos-link" style={{ marginTop: 0 }}>
+            View All <ArrowRight style={{ width: 12, height: 12 }} />
           </Link>
         </div>
-        <div className="divide-y divide-[var(--os-border)]">
+        <div>
           {analytics.highValueOrders.map((order) => (
             <Link
               key={order.id}
               href={`/dashboard-admin-vrixo-ravi/orders?search=${encodeURIComponent(order.orderNumber)}`}
-              className="os-row flex items-center justify-between gap-3 px-4 py-3 md:px-5"
+              className="cos-row"
             >
-              <div className="min-w-0">
-                <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--os-text-3)]">{order.orderNumber}</p>
-                <p className="text-sm font-semibold text-[var(--os-text)]">{order.customerName}</p>
-                <p className="text-[10px] text-[var(--os-text-3)]">{formatDate(order.createdAt)} / {order.orderStatus} / {order.paymentStatus}</p>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--cos-text-tertiary)" }}>{order.orderNumber}</p>
+                <p style={{ fontSize: "13px", fontWeight: 600 }}>{order.customerName}</p>
+                <p style={{ fontSize: "11px", color: "var(--cos-text-tertiary)" }}>{formatDate(order.createdAt)} · {order.orderStatus} · {order.paymentStatus}</p>
               </div>
-              <span className="shrink-0 text-sm font-bold text-white">{money(order.total)}</span>
+              <span style={{ flexShrink: 0, fontSize: "13px", fontWeight: 700 }}>{money(order.total)}</span>
             </Link>
           ))}
         </div>
@@ -335,54 +312,44 @@ function buildTopCustomers(orders: ReturnType<typeof normalizeOrder>[]) {
 
 function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ background: "rgba(255,255,255,0.015)", border: "1px solid var(--os-border)", borderRadius: "9px", padding: "10px" }}>
-      <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--os-text-3)]">{label}</p>
-      <p className="mt-2 text-lg font-bold text-white tabular-nums">{value}</p>
+    <div style={{ padding: "10px", borderRadius: "var(--cos-r)", border: "1px solid var(--cos-border)", background: "rgba(255,255,255,0.03)" }}>
+      <p style={{ fontSize: "9px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--cos-text-tertiary)" }}>{label}</p>
+      <p style={{ fontSize: "18px", fontWeight: 800, marginTop: "6px", fontVariantNumeric: "tabular-nums" }}>{value}</p>
     </div>
   );
 }
 
-const colorGlow: Record<string, string> = {
-  indigo: 'rgba(99,102,241,0.04)', emerald: 'rgba(16,185,129,0.04)',
-  rose: 'rgba(244,63,94,0.04)', violet: 'rgba(139,92,246,0.04)',
-  amber: 'rgba(245,158,11,0.04)', sky: 'rgba(6,182,212,0.04)',
-};
-
-function Metric({ icon: Icon, label, value, hint, up, color }: {
+function Metric({ icon: Icon, label, value, hint, up }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string; value: string | number; hint: string;
-  up?: boolean; color: string;
+  up?: boolean;
 }) {
   return (
-    <div className="os-metric">
-      <div className="m-glow" style={{ background: colorGlow[color] || 'var(--os-accent)', opacity: 0.08 }} />
-      <div className="m-top">
-        <div>
-          <div className="m-label">{label}</div>
-          <div className="m-value">{value}</div>
-          <div className={`m-trend ${up === undefined ? 'neutral' : up ? 'up' : 'down'}`}>
-            {up !== undefined ? (up ? '↑' : '↓') : '—'} {hint}
-          </div>
+    <div className="cos-metric-card">
+      <div className="cos-metric-icon"><Icon /></div>
+      <div className="cos-metric-label">{label}</div>
+      <div className="cos-metric-value">{value}</div>
+      <div className="cos-metric-sub">{hint}</div>
+      {up !== undefined && (
+        <div className={`cos-metric-trend ${up ? "cos-metric-trend-up" : ""}`}>
+          {up ? "↑" : "↓"} {hint}
         </div>
-        <div className="m-icon" style={{ background: 'var(--os-accent-soft)', color: 'var(--os-accent)' }}>
-          <Icon className="h-[15px] w-[15px]" />
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
 function TrendRow({ label, value, sub, width }: { label: string; value: string; sub: string; width: number }) {
   return (
-    <div className="grid gap-2 sm:grid-cols-[90px_1fr_130px] sm:items-center">
+    <div style={{ display: "grid", gap: "6px", gridTemplateColumns: "90px 1fr 120px", alignItems: "center" }}>
       <div>
-        <p className="text-sm font-bold text-[var(--os-text)]">{label}</p>
-        <p className="text-[10px] text-[var(--os-text-3)]">{sub}</p>
+        <p style={{ fontSize: "12px", fontWeight: 600 }}>{label}</p>
+        <p style={{ fontSize: "10px", color: "var(--cos-text-tertiary)" }}>{sub}</p>
       </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-[var(--os-surface-3)]">
-        <div className="h-full rounded-full bg-gradient-to-r from-[var(--os-accent)] to-[var(--os-success)]" style={{ width: `${Math.max(4, width)}%` }} />
+      <div className="cos-progress-track" style={{ height: "6px" }}>
+        <span className="cos-progress-fill" style={{ width: `${Math.max(4, width)}%` }} />
       </div>
-      <p className="text-sm font-bold text-white sm:text-right tabular-nums">{value}</p>
+      <p style={{ fontSize: "12px", fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{value}</p>
     </div>
   );
 }
@@ -392,16 +359,14 @@ function SignalCard({ icon: Icon, title, value, description, href }: {
   title: string; value: string; description: string; href: string;
 }) {
   return (
-    <Link href={href} className="group block rounded-[var(--os-radius-sm)] border border-[var(--os-border)] bg-[rgba(255,255,255,0.012)] p-3 transition hover:border-[var(--os-border-light)]">
-      <div className="flex items-start justify-between gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--os-accent-soft)] text-[var(--os-accent)]">
-          <Icon className="h-3.5 w-3.5" />
-        </span>
-        <ArrowRight className="h-3 w-3 text-[var(--os-text-3)] transition group-hover:translate-x-0.5 group-hover:text-[var(--os-text)]" />
+    <Link href={href} style={{ display: "block", padding: "12px", borderRadius: "var(--cos-r-lg)", border: "1px solid var(--cos-border)", background: "rgba(255,255,255,0.02)", textDecoration: "none", transition: "all 0.2s" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+        <div className="cos-metric-icon" style={{ width: "28px", height: "28px" }}><Icon /></div>
+        <ArrowRight style={{ width: 12, height: 12, color: "var(--cos-text-tertiary)", marginLeft: "auto" }} />
       </div>
-      <p className="mt-3 text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--os-text-3)]">{title}</p>
-      <p className="mt-1 text-lg font-bold text-white tabular-nums">{value}</p>
-      <p className="mt-1 text-[10px] leading-5 text-[var(--os-text-3)]">{description}</p>
+      <p style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--cos-text-tertiary)" }}>{title}</p>
+      <p style={{ fontSize: "18px", fontWeight: 800, marginTop: "4px", fontVariantNumeric: "tabular-nums" }}>{value}</p>
+      <p style={{ fontSize: "11px", color: "var(--cos-text-tertiary)", marginTop: "2px" }}>{description}</p>
     </Link>
   );
 }
@@ -412,26 +377,26 @@ function BreakdownPanel({ title, rows, emptyText = "No data yet." }: {
   emptyText?: string;
 }) {
   return (
-    <div className="os-card">
-      <div className="os-card-header">
+    <div className="cos-section">
+      <div className="cos-section-header">
         <div>
-          <h3>{title}</h3>
-          <p>Share by order count and revenue</p>
+          <h3 style={{ fontSize: "14px", fontWeight: 700 }}>{title}</h3>
+          <p style={{ fontSize: "11px", color: "var(--cos-text-tertiary)", marginTop: "2px" }}>Share by order count and revenue</p>
         </div>
       </div>
-      <div className="grid gap-4 p-4">
+      <div style={{ display: "grid", gap: "12px", padding: "14px" }}>
         {rows.length ? rows.map((row) => (
           <div key={row.label}>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-bold text-[var(--os-text)]">{row.label}</p>
-              <p className="text-[10px] font-semibold text-[var(--os-text-3)]">{row.orders} orders</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+              <p style={{ fontSize: "12px", fontWeight: 600 }}>{row.label}</p>
+              <p style={{ fontSize: "10px", fontWeight: 600, color: "var(--cos-text-tertiary)" }}>{row.orders} orders</p>
             </div>
-            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[var(--os-surface-3)]">
-              <div className="h-full rounded-full bg-gradient-to-r from-[var(--os-accent)] to-[var(--os-accent)]" style={{ width: `${Math.max(5, row.width)}%` }} />
+            <div className="cos-progress-track" style={{ marginTop: "4px", height: "5px" }}>
+              <span className="cos-progress-fill" style={{ width: `${Math.max(5, row.width)}%` }} />
             </div>
-            <p className="mt-1.5 text-[10px] text-[var(--os-text-3)] tabular-nums">{money(row.revenue)}</p>
+            <p style={{ fontSize: "10px", color: "var(--cos-text-tertiary)", marginTop: "4px", fontVariantNumeric: "tabular-nums" }}>{money(row.revenue)}</p>
           </div>
-        )) : <p className="text-sm text-[var(--os-text-3)]">{emptyText}</p>}
+        )) : <p style={{ fontSize: "12px", color: "var(--cos-text-tertiary)" }}>{emptyText}</p>}
       </div>
     </div>
   );
@@ -439,27 +404,27 @@ function BreakdownPanel({ title, rows, emptyText = "No data yet." }: {
 
 function RankRow({ rank, title, meta, value, icon: Icon }: {
   rank: number; title: string; meta: string; value: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
 }) {
   return (
-    <div className="os-row flex items-center justify-between gap-3 px-4 py-3 md:px-5">
-      <div className="flex items-center gap-3 min-w-0">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--os-surface-3)] text-[10px] font-bold text-[var(--os-text-3)]">{rank}</span>
-        <div className="min-w-0">
-          <p className="flex items-center gap-1.5 text-sm font-semibold text-[var(--os-text)]">
-            <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--os-text-3)]" />
-            <span className="truncate">{title}</span>
+    <div className="cos-row">
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+        <span style={{ width: "28px", height: "28px", borderRadius: "var(--cos-r)", border: "1px solid var(--cos-border)", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: 700, color: "var(--cos-text-tertiary)", flexShrink: 0 }}>{rank}</span>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 600 }}>
+            <Icon style={{ width: 13, height: 13, color: "var(--cos-text-tertiary)", flexShrink: 0 }} />
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
           </p>
-          <p className="text-[10px] text-[var(--os-text-3)]">{meta}</p>
+          <p style={{ fontSize: "10px", color: "var(--cos-text-tertiary)" }}>{meta}</p>
         </div>
       </div>
-      <p className="shrink-0 text-sm font-bold text-white tabular-nums">{value}</p>
+      <p style={{ flexShrink: 0, fontSize: "12px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{value}</p>
     </div>
   );
 }
 
 function EmptyPanel({ text }: { text: string }) {
-  return <p className="p-5 text-sm text-[var(--os-text-3)]">{text}</p>;
+  return <p style={{ padding: "20px", fontSize: "12px", color: "var(--cos-text-tertiary)", textAlign: "center" }}>{text}</p>;
 }
 
 function getAddressValue(address: Record<string, unknown> | null, key: string) {
