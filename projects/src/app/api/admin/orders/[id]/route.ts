@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdminApi } from "@/lib/require-admin";
 import { logAdminAudit } from "@/lib/admin-audit";
@@ -10,6 +11,11 @@ import { safeRoute } from "@/lib/safe-route";
 
 const allowedStatuses = new Set(["confirmed", "processing", "packed", "shipped", "delivered", "cancelled"]);
 
+const updateOrderSchema = z.object({
+  orderStatus: z.string().min(1),
+  notes: z.string().optional().nullable(),
+});
+
 export const PATCH = safeRoute(async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -19,9 +25,14 @@ export const PATCH = safeRoute(async function PATCH(
   const originError = requireSameOrigin(request);
   if (originError) return originError;
 
-  const body = (await request.json()) as { orderStatus: string };
+  const body = await request.json().catch(() => null);
+  const parsed = updateOrderSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ message: "Invalid request data." }, { status: 400 });
+  }
+
   const { id } = await params;
-  const orderStatus = String(body.orderStatus ?? "").toLowerCase();
+  const orderStatus = String(parsed.data.orderStatus ?? "").toLowerCase();
 
   if (!allowedStatuses.has(orderStatus)) {
     return NextResponse.json({ message: "Invalid order status." }, { status: 400 });

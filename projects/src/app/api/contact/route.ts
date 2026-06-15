@@ -37,7 +37,7 @@ export const POST = safeRoute(async function POST(request: Request) {
 
   if (error) {
     console.error("CONTACT_SUBMIT_ERROR", error);
-    return NextResponse.json({ message: error.message || "Message could not be sent." }, { status: 500 });
+    return NextResponse.json({ message: "Message could not be sent. Please try again." }, { status: 500 });
   }
 
   return NextResponse.json({ message: "Message sent successfully." });

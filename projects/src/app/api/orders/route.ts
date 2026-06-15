@@ -264,8 +264,8 @@ export async function POST(request: Request) {
   } catch (error: any) {
     const durationMs = Math.round(performance.now() - startedAt);
     const message = toErrorMessage(error);
-    console.error("[checkout.cod] request_failed", JSON.stringify({ requestId, durationMs, error: message, stack: error?.stack }));
-    return jsonError(`Order could not be placed. (${message})`, 500, resolveErrorCode(message), requestId);
+    console.error("[checkout.cod] request_failed", JSON.stringify({ requestId, durationMs, error: message }));
+    return jsonError("Something went wrong. Please try again.", 500, resolveErrorCode(message), requestId);
   }
 }
 

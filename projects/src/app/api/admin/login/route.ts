@@ -47,52 +47,8 @@ export const POST = safeRoute(async function POST(request: NextRequest) {
   const routeSupabase = createRouteHandlerSupabaseClient(request, response);
   const admin = createAdminClient();
 
-  // Try sign in
+  // Try sign in — no auto-provisioning for security
   let { data, error } = await routeSupabase.auth.signInWithPassword({ email, password: parsed.data.password });
-
-  // If user doesn't exist in Supabase auth, auto-provision them
-  if (error && (error.message.includes("Invalid login") || error.message.includes("not found") || error.message.includes("credentials"))) {
-    const { data: existingUsers } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const existingUser = existingUsers?.users?.find((u) => u.email?.toLowerCase() === email);
-
-    if (!existingUser) {
-      // Create the user in Supabase auth
-      const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email,
-        password: parsed.data.password,
-        email_confirm: true,
-        user_metadata: { name: "Admin", role: "admin" }
-      });
-
-      if (!createError && created?.user) {
-        // Upsert profile as admin
-        await admin.from("profiles").upsert({
-          id: created.user.id,
-          email,
-          name: "Admin",
-          role: "admin",
-          is_active: true
-        }, { onConflict: "id" });
-
-        // Try sign in again
-        const retry = await routeSupabase.auth.signInWithPassword({ email, password: parsed.data.password });
-        data = retry.data;
-        error = retry.error;
-      }
-    } else {
-      // User exists but password doesn't match or email not confirmed
-      // Update their password and confirm email
-      await admin.auth.admin.updateUserById(existingUser.id, {
-        password: parsed.data.password,
-        email_confirm: true
-      });
-
-      // Try sign in again
-      const retry = await routeSupabase.auth.signInWithPassword({ email, password: parsed.data.password });
-      data = retry.data;
-      error = retry.error;
-    }
-  }
 
   if (error || !data?.user || !data?.session) {
     console.error("[admin-login] final auth error:", error?.message);

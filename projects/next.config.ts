@@ -15,7 +15,7 @@ const connectSrc = [
   "'self'",
   "https:",
   "wss:",
-  "*.supabase.co",
+  "rcttssjtujvntyvtclyh.supabase.co",
   "api.razorpay.com",
   "checkout.razorpay.com",
   isDev && "https://vercel.live",
@@ -73,10 +73,6 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "**.supabase.co"
-      },
-      {
-        protocol: "https",
         hostname: "rcttssjtujvntyvtclyh.supabase.co"
       }
     ],
@@ -95,10 +91,12 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
           { key: "X-DNS-Prefetch-Control", value: "off" },
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+          { key: "X-XSS-Protection", value: "1; mode=block" },
           { key: "Content-Security-Policy", value: contentSecurityPolicy },
           {
             key: "Permissions-Policy",

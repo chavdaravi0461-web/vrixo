@@ -2,7 +2,7 @@ import "server-only";
 import crypto from "node:crypto";
 
 export const ADMIN_COOKIE_NAME = "dc_admin_session";
-export const ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60;
+export const ADMIN_SESSION_TTL_SECONDS = 1 * 60 * 60;
 
 type AdminSessionPayload = {
   sub: string;
