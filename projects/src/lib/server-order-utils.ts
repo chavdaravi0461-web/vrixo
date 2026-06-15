@@ -24,11 +24,15 @@ export async function buildOrderSnapshotFromProducts(supabase: SupabaseClient, i
     throw new Error("Cart is empty.");
   }
 
-  const productIds = [...new Set(items.map((item) => item.productId).filter(Boolean))];
-  const { data: products, error } = await supabase
-    .from("products")
-    .select("id, slug, title, price, stock, sku, images")
-    .in("id", productIds);
+  const rawIds = [...new Set(items.map((item) => item.productId).filter(Boolean))];
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const validUuidIds = rawIds.filter((id): id is string => uuidPattern.test(id));
+  const { data: products, error } = validUuidIds.length > 0
+    ? await supabase
+        .from("products")
+        .select("id, slug, title, price, stock, sku, images")
+        .in("id", validUuidIds)
+    : { data: [], error: null };
 
   if (error) {
     throw error;
