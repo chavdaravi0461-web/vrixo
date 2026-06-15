@@ -11,7 +11,7 @@ type RateLimitOptions = {
 export const buckets = new Map<string, { count: number; resetAt: number }>();
 
 export const secureCartItemSchema = z.object({
-  productId: z.string().uuid("Invalid product ID."),
+  productId: z.string().trim().min(1, "Product ID is required."),
   slug: z.string().trim().min(1).max(160),
   title: z.string().trim().min(1).max(240),
   image: z
