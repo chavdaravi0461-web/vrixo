@@ -192,7 +192,7 @@ export async function POST(request: Request) {
     });
 
     // Fire-and-forget: send WhatsApp directly
-    fireWhatsAppConfirmation({
+    void fireWhatsAppConfirmation({
       orderId: order.order_id,
       orderNumber: order.order_number,
       customerName,
@@ -204,6 +204,8 @@ export async function POST(request: Request) {
       total,
       items: cart.snapshotItems,
       shippingAddress: body.shippingAddress,
+    }).catch((err) => {
+      console.error("[checkout.cod] fireWhatsAppConfirmation_unhandled", JSON.stringify({ requestId, orderId: order.order_id, error: String(err?.message ?? err) }));
     });
 
     // Fire-and-forget: background tasks
@@ -637,7 +639,11 @@ async function fireWhatsAppConfirmation(input: {
   shippingAddress: Record<string, unknown>;
 }) {
   try {
-    if (!hasWhatsAppServerEnv()) return;
+    console.log("[order.whatsapp] started", JSON.stringify({ orderId: input.orderId, orderNumber: input.orderNumber, phone: input.customerPhone }));
+    if (!hasWhatsAppServerEnv()) {
+      console.warn("[order.whatsapp] env_missing", JSON.stringify({ orderId: input.orderId }));
+      return;
+    }
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || getAppUrl();
     const productNames = input.items.map(i => String(i.title ?? i.name ?? "")).filter(Boolean).join(", ") || "Vrixo product";
     const totalQty = input.items.reduce((s, i) => s + (typeof i.quantity === "number" ? i.quantity : 1), 0);
@@ -646,13 +652,14 @@ async function fireWhatsAppConfirmation(input: {
     const productImageUrl = rawImage ? (() => { try { return new URL(rawImage, appUrl).toString(); } catch { return `${appUrl}/placeholder-product.svg`; } })() : `${appUrl}/placeholder-product.svg`;
     const addr = input.shippingAddress as Record<string, unknown>;
     const deliveryAddress = addr ? [addr.line1, addr.line2, addr.city, addr.state, addr.postalCode, addr.country].map(p => p ? String(p).trim() : "").filter(Boolean).join(", ") : "";
-    await sendOrderConfirmationWhatsApp({
+    const result = await sendOrderConfirmationWhatsApp({
       customerName: input.customerName, customerPhone: input.customerPhone,
       orderNumber: input.orderNumber, productNames, totalQty, totalAmount: input.total,
       orderStatus: input.orderStatus, paymentMethod: input.paymentMethod,
       paymentStatus: input.paymentStatus, productImageUrl, deliveryAddress,
     });
+    console.log("[order.whatsapp] completed", JSON.stringify({ orderId: input.orderId, sent: result.sent, error: result.error, messageId: result.customerMessageId }));
   } catch (error: any) {
-    console.warn("[order.whatsapp] confirmation_failed", JSON.stringify({ orderId: input.orderId, error: String(error?.message ?? error) }));
+    console.error("[order.whatsapp] confirmation_failed", JSON.stringify({ orderId: input.orderId, error: String(error?.message ?? error), stack: error?.stack }));
   }
 }
