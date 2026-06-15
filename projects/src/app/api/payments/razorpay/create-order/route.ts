@@ -23,6 +23,7 @@ import { badRequest, serverError, tooManyRequests } from "@/lib/api-response";
 import { publishEvent } from "@/lib/event-bus";
 import { fetchWithTimeout, safeJson } from "@/lib/request-timeout";
 import { sanitizeCustomerPhone } from "@/lib/whatsapp/phone";
+import { ensureCheckoutUser } from "@/lib/guest-customer";
 import { safeRoute } from "@/lib/safe-route";
 
 const createRazorpayOrderSchema = z.object({
@@ -94,15 +95,24 @@ export const POST = safeRoute(async function POST(request: Request) {
     error?: { description?: string };
   };
 
-  const checkoutUser = user
+  let checkoutUser = user
     ? { id: user.id, email: user.email ?? body.email ?? "" }
     : null;
 
+  let tempPassword: string | undefined;
+
   if (!checkoutUser) {
-    return NextResponse.json(
-      { message: "Please login or create an account before starting online payment." },
-      { status: 401 }
-    );
+    try {
+      const customerName = String(body.shippingAddress.fullName ?? "").trim();
+      const customerPhone = String(body.shippingAddress.phone ?? "").trim();
+      const result = await ensureCheckoutUser({
+        email: body.email, name: customerName || "Customer", phone: customerPhone,
+      });
+      checkoutUser = { id: result.userId, email: body.email };
+      tempPassword = result.tempPassword;
+    } catch (error: any) {
+      return NextResponse.json({ message: "Could not create your account." }, { status: 500 });
+    }
   }
 
   if (body.idempotencyKey) {
@@ -219,6 +229,13 @@ export const POST = safeRoute(async function POST(request: Request) {
         razorpayOrderId: payload.id
       }
     }).catch((error) => console.error("[razorpay.create_order] event publish failed", error));
+
+    // Auto-sign-in new guest users
+    if (tempPassword && body.email) {
+      try {
+        await authSupabase.auth.signInWithPassword({ email: body.email, password: tempPassword });
+      } catch {}
+    }
 
     return NextResponse.json({
       success: true,
@@ -409,7 +426,7 @@ async function createPendingOnlineOrder({
   const { error: itemsError } = await supabase.from("order_items").insert(
     snapshotItems.map((item) => ({
       order_id: orderId,
-      product_id: item.productId,
+      product_id: typeof item.productId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.productId) ? item.productId : null,
       title: String(item.title ?? ""),
       sku: String(item.sku ?? ""),
       price: Number(item.price ?? 0),

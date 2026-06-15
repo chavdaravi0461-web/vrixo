@@ -16,6 +16,9 @@ import { defaultShippingSettings, getShippingSettings } from "@/lib/shipping-set
 import { buildOrderSnapshotFromProducts } from "@/lib/server-order-utils";
 import { runPostOrderTasks } from "@/services/orders/post-order-tasks";
 import { sanitizeCustomerPhone } from "@/lib/whatsapp/phone";
+import { sendOrderConfirmationWhatsApp, formatWhatsAppPhone, hasWhatsAppServerEnv } from "@/lib/whatsapp";
+import { getAppUrl } from "@/lib/app-url";
+import { ensureCheckoutUser } from "@/lib/guest-customer";
 import { generateRequestId } from "@/lib/observability";
 import { withTimeout } from "@/lib/request-timeout";
 
@@ -25,6 +28,10 @@ export const dynamic = "force-dynamic";
 const COD_RESPONSE_BUDGET_MS = 2800;
 const SUPABASE_INSERT_TIMEOUT_MS = 1800;
 const SECONDARY_WRITE_TIMEOUT_MS = 5000;
+
+function isValidUuid(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
 
 const orderRequestSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -96,14 +103,28 @@ export async function POST(request: Request) {
       if (supabaseUser) userId = supabaseUser.id;
     }
 
-    if (!userId) {
-      return jsonError("Please login or create an account before placing an order.", 401, "AUTH_REQUIRED", requestId);
-    }
-
     const customerName = body.shippingAddress.fullName.trim();
     const customerPhone = sanitizeCustomerPhone(body.shippingAddress.phone);
     if (!customerPhone) {
       return jsonError("Invalid phone number. Please provide a valid 10-digit Indian phone number.", 400, "INVALID_PHONE", requestId, "phone");
+    }
+
+    // Auto-create account if not logged in (WooCommerce-style guest checkout)
+    let tempPassword: string | undefined;
+    if (!userId) {
+      try {
+        const checkoutUser = await ensureCheckoutUser({
+          email: body.email || "",
+          name: customerName,
+          phone: body.shippingAddress.phone,
+        });
+        userId = checkoutUser.userId;
+        tempPassword = checkoutUser.tempPassword;
+        console.info("[checkout.cod] auto_account_created", JSON.stringify({ requestId, userId, isNewUser: checkoutUser.isNewUser }));
+      } catch (error: any) {
+        console.error("[checkout.cod] auto_account_failed", JSON.stringify({ requestId, error: error?.message ?? String(error) }));
+        return jsonError("Could not create your account. Please try again.", 500, "ACCOUNT_CREATE_FAILED", requestId);
+      }
     }
 
     const adminSupabase = createAdminClient();
@@ -170,26 +191,54 @@ export async function POST(request: Request) {
       requestId
     });
 
-    try {
-      await runPostOrderTasks({
-        orderId: order.order_id,
-        orderNumber: order.order_number,
-        userId,
-        customerName,
-        customerPhone,
-        customerEmail,
-        couponCode: body.couponCode,
-        orderStatus: "pending",
-        paymentMethod: "cod",
-        paymentStatus: "cod_pending",
-        total,
-        items: cart.snapshotItems,
-        shippingAddress: body.shippingAddress,
-        sessionId: request.headers.get("x-vrixo-session"),
-        requestId
-      });
-    } catch (error) {
-      console.warn("[checkout.cod] post_order_tasks_failed", JSON.stringify({ requestId, orderId: order.order_id, error: toErrorMessage(error) }));
+    // Fire-and-forget: send WhatsApp directly
+    fireWhatsAppConfirmation({
+      orderId: order.order_id,
+      orderNumber: order.order_number,
+      customerName,
+      customerPhone,
+      customerEmail,
+      orderStatus: "pending",
+      paymentMethod: "cod",
+      paymentStatus: "cod_pending",
+      total,
+      items: cart.snapshotItems,
+      shippingAddress: body.shippingAddress,
+    });
+
+    // Fire-and-forget: background tasks
+    void runPostOrderTasks({
+      orderId: order.order_id,
+      orderNumber: order.order_number,
+      userId,
+      customerName,
+      customerPhone,
+      customerEmail,
+      couponCode: body.couponCode,
+      orderStatus: "pending",
+      paymentMethod: "cod",
+      paymentStatus: "cod_pending",
+      total,
+      items: cart.snapshotItems,
+      shippingAddress: body.shippingAddress,
+      sessionId: request.headers.get("x-vrixo-session"),
+      requestId
+    }).catch((error) => {
+      console.warn("[checkout.cod] post_order_tasks_failed", JSON.stringify({ requestId, orderId: order.order_id, error: String(error?.message ?? error) }));
+    });
+
+    // Auto-sign-in new guest users so they get a session cookie
+    if (tempPassword && customerEmail) {
+      try {
+        const authSupabase = await createServerSupabaseClient();
+        await authSupabase.auth.signInWithPassword({
+          email: customerEmail,
+          password: tempPassword,
+        });
+        console.info("[checkout.cod] auto_signin_success", JSON.stringify({ requestId, email: customerEmail }));
+      } catch (error: any) {
+        console.warn("[checkout.cod] auto_signin_failed", JSON.stringify({ requestId, error: String(error?.message ?? error) }));
+      }
     }
 
     const durationMs = Math.round(performance.now() - startedAt);
@@ -212,11 +261,11 @@ export async function POST(request: Request) {
       whatsappQueued: true,
       requestId
     });
-  } catch (error) {
+  } catch (error: any) {
     const durationMs = Math.round(performance.now() - startedAt);
     const message = toErrorMessage(error);
-    console.error("[checkout.cod] request_failed", JSON.stringify({ requestId, durationMs, error: message }));
-    return jsonError(resolvePublicErrorMessage(message), 500, resolveErrorCode(message), requestId);
+    console.error("[checkout.cod] request_failed", JSON.stringify({ requestId, durationMs, error: message, stack: error?.stack }));
+    return jsonError(`Order could not be placed. (${message})`, 500, resolveErrorCode(message), requestId);
   }
 }
 
@@ -235,7 +284,7 @@ async function getSafeCartSnapshot(items: z.infer<typeof secureCartItemsSchema>,
       900,
       "Product validation timed out."
     );
-  } catch (error) {
+  } catch (error: any) {
     console.warn("[checkout.cod] product_validation_fallback", JSON.stringify({ requestId, error: toErrorMessage(error) }));
     const snapshotItems = items.map((item) => ({
       productId: item.productId,
@@ -281,7 +330,7 @@ async function getSafeDiscount({
       return 0;
     }
     return result.discount;
-  } catch (error) {
+  } catch (error: any) {
     console.warn("[checkout.cod] coupon_validation_failed", JSON.stringify({ requestId, error: toErrorMessage(error) }));
     return 0;
   }
@@ -310,7 +359,7 @@ async function findExistingOrder(supabase: SupabaseAdmin, idempotencyKey: string
       customer_phone: data.customer_phone ?? "",
       idempotent_replay: true
     };
-  } catch (error) {
+  } catch (error: any) {
     console.warn("[checkout.cod] idempotency_lookup_failed", JSON.stringify({ requestId, error: toErrorMessage(error) }));
     return null;
   }
@@ -465,7 +514,7 @@ async function runSecondaryOrderWrites({
 
       const itemRows = snapshotItems.map((item) => ({
         order_id: orderId,
-        product_id: item.productId,
+        product_id: isValidUuid(item.productId) ? item.productId : null,
         title: String(item.title ?? ""),
         sku: String(item.sku ?? ""),
         price: Number(item.price ?? 0),
@@ -493,7 +542,7 @@ async function runSecondaryOrderWrites({
         console.warn("[checkout.cod] secondary_payment_failed", JSON.stringify({ requestId, orderId, error: paymentError.message }));
       }
     })(), SECONDARY_WRITE_TIMEOUT_MS, "Secondary order writes timed out.");
-  } catch (error) {
+  } catch (error: any) {
     console.warn("[checkout.cod] secondary_writes_failed", JSON.stringify({ requestId, orderId, error: toErrorMessage(error) }));
   }
 }
@@ -579,4 +628,32 @@ function jsonError(message: string, status: number, code: string, requestId: str
 function toErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+async function fireWhatsAppConfirmation(input: {
+  orderId: string; orderNumber: string; customerName: string;
+  customerPhone: string; customerEmail: string; orderStatus: string;
+  paymentMethod: "cod" | "online"; paymentStatus: string; total: number;
+  items: Array<{ name?: string; title?: string; quantity?: number; price?: number; image?: string; productImageUrl?: string }>;
+  shippingAddress: Record<string, unknown>;
+}) {
+  try {
+    if (!hasWhatsAppServerEnv()) return;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || getAppUrl();
+    const productNames = input.items.map(i => String(i.title ?? i.name ?? "")).filter(Boolean).join(", ") || "Vrixo product";
+    const totalQty = input.items.reduce((s, i) => s + (typeof i.quantity === "number" ? i.quantity : 1), 0);
+    const firstItem = input.items[0] || {};
+    const rawImage = String(firstItem.image ?? firstItem.productImageUrl ?? "");
+    const productImageUrl = rawImage ? (() => { try { return new URL(rawImage, appUrl).toString(); } catch { return `${appUrl}/placeholder-product.svg`; } })() : `${appUrl}/placeholder-product.svg`;
+    const addr = input.shippingAddress as Record<string, unknown>;
+    const deliveryAddress = addr ? [addr.line1, addr.line2, addr.city, addr.state, addr.postalCode, addr.country].map(p => p ? String(p).trim() : "").filter(Boolean).join(", ") : "";
+    await sendOrderConfirmationWhatsApp({
+      customerName: input.customerName, customerPhone: input.customerPhone,
+      orderNumber: input.orderNumber, productNames, totalQty, totalAmount: input.total,
+      orderStatus: input.orderStatus, paymentMethod: input.paymentMethod,
+      paymentStatus: input.paymentStatus, productImageUrl, deliveryAddress,
+    });
+  } catch (error: any) {
+    console.warn("[order.whatsapp] confirmation_failed", JSON.stringify({ orderId: input.orderId, error: String(error?.message ?? error) }));
+  }
 }
