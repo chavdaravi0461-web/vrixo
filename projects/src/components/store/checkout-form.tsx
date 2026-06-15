@@ -43,16 +43,6 @@ export function CheckoutForm({
   const shippingCharge = calculateShippingCharge(subtotal, items, shippingSettings);
   const total = Math.max(0, subtotal + shippingCharge - discount);
 
-  if (!userId) {
-    return (
-      <div className="glass-card" style={{ padding: "24px", textAlign: "center" }}>
-        <h2 className="display-md" style={{ fontSize: "16px", letterSpacing: "-.015em", textTransform: "uppercase", marginBottom: "16px" }}>Login Required</h2>
-        <p className="body-sm" style={{ marginBottom: "24px" }}>Please sign in to your account before proceeding to checkout.</p>
-        <a href="/login?redirectTo=/checkout" className="hero-btn hero-btn-primary inline-flex" style={{ textDecoration: "none" }}>Sign In</a>
-      </div>
-    );
-  }
-
   const { register, handleSubmit, setError, setValue, control, formState: { errors, isSubmitting } } = useForm<CheckoutValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: { paymentMethod: "Cash on Delivery", country: "India" }
@@ -198,7 +188,15 @@ export function CheckoutForm({
         <div className="grid gap-4 md:grid-cols-2" style={{ marginTop: "24px" }}>
           <Field label="Full name" error={errors.fullName?.message}><Input {...register("fullName")} /></Field>
           <Field label="Email" error={errors.email?.message}><Input type="email" {...register("email")} /></Field>
-          <Field label="Phone" error={errors.phone?.message}><Input {...register("phone")} /></Field>
+          <p className="body-sm" style={{ gridColumn: "1 / -1", marginTop: "-8px", color: "var(--text-muted)", fontSize: "12px" }}>
+            A Vrixo account will be automatically created with this email. You can set a password later via "Forgot Password" on the login page.
+          </p>
+          <Field label="Phone" error={errors.phone?.message}>
+            <div style={{ position: "relative" }}>
+              <span style={{ position: "absolute", left: 12, top: 10, color: "var(--text-muted)", fontSize: "13px", pointerEvents: "none", zIndex: 1 }}>+91</span>
+              <Input {...register("phone")} style={{ paddingLeft: "36px" }} maxLength={10} inputMode="numeric" pattern="[0-9]*" />
+            </div>
+          </Field>
           <Field label="Postal code" error={errors.postalCode?.message}>
             <div style={{ position: "relative" }}>
               <Input

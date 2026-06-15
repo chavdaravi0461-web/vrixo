@@ -51,6 +51,19 @@ export async function findOrderForUser(orderNumberRaw: string, userId: string) {
   return (data as OrderRecord | null) ?? null;
 }
 
+export async function findOrderByOrderNumber(orderNumberRaw: string) {
+  const orderNumber = normalizeOrderNumber(orderNumberRaw);
+  if (!isValidOrderNumber(orderNumber)) return null;
+  if (!canQueryOrders()) return null;
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("orders")
+    .select("id, user_id, order_number, total, payment_method, payment_status, order_status, razorpay_payment_id, created_at, customer_phone, customer_name, shipping_address, items, whatsapp_status, whatsapp_error")
+    .eq("order_number", orderNumber)
+    .maybeSingle();
+  return (data as OrderRecord | null) ?? null;
+}
+
 export async function findOrderForUserWithRetry(
   orderNumberRaw: string,
   userId: string,

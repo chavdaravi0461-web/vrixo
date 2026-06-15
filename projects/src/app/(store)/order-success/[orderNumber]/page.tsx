@@ -1,12 +1,11 @@
-import { redirect } from "next/navigation";
 import { buildMetadata } from "@/lib/metadata";
 import { getCurrentUser } from "@/lib/auth";
 import { getAppUrl } from "@/lib/app-url";
-import { buildOrderSuccessPath } from "@/lib/safe-navigation";
 import { decodeOrderNumberParam, isValidOrderNumber } from "@/lib/orders/order-numbers";
 import {
   canQueryOrders,
-  findOrderForUserWithRetry
+  findOrderForUserWithRetry,
+  findOrderByOrderNumber
 } from "@/lib/orders/order-repository";
 import { buildOrderStatusView } from "@/lib/orders/order-status";
 import { OrderSuccessView } from "@/components/orders/order-success-view";
@@ -29,14 +28,6 @@ export default async function OrderSuccessPage({
   const query = await searchParams;
   const orderNumber = decodeOrderNumberParam(rawOrderNumber);
   const user = await getCurrentUser();
-
-  if (!user) {
-    redirect(
-      `/login?next=${encodeURIComponent(
-        buildOrderSuccessPath(orderNumber, { verifiedPayment: query.verifiedPayment })
-      )}`
-    );
-  }
 
   if (!isValidOrderNumber(orderNumber)) {
     return (
@@ -68,7 +59,9 @@ export default async function OrderSuccessPage({
     );
   }
 
-  const order = await findOrderForUserWithRetry(orderNumber, user.id);
+  const order = user
+    ? await findOrderForUserWithRetry(orderNumber, user.id)
+    : await findOrderByOrderNumber(orderNumber);
   const appUrl = getAppUrl();
 
   if (!order) {

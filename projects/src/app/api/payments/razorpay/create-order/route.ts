@@ -426,7 +426,6 @@ async function createPendingOnlineOrder({
   const { error: itemsError } = await supabase.from("order_items").insert(
     snapshotItems.map((item) => ({
       order_id: orderId,
-      product_id: typeof item.productId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.productId) ? item.productId : null,
       title: String(item.title ?? ""),
       sku: String(item.sku ?? ""),
       price: Number(item.price ?? 0),

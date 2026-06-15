@@ -1,78 +1,110 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { normalizeIndianMobileNumber, getIndianMobileLookupVariants } from "@/lib/phone";
 
-type GuestCustomerInput = {
-  email?: string | null;
-  shippingAddress: Record<string, unknown>;
+type CheckoutUserResult = {
+  userId: string;
+  isNewUser: boolean;
+  tempPassword?: string;
 };
 
-export async function createGuestCustomerProfile({ email, shippingAddress }: GuestCustomerInput) {
+export async function ensureCheckoutUser({
+  email,
+  name,
+  phone,
+}: {
+  email: string;
+  name: string;
+  phone?: string;
+}): Promise<CheckoutUserResult> {
   const supabase = createAdminClient();
-  const guestId = crypto.randomUUID();
-  const customerName = String(shippingAddress.fullName ?? "").trim() || "Guest Customer";
-  const customerPhone = String(shippingAddress.phone ?? "").trim();
-  const orderEmail = String(email ?? "").trim();
-  const authEmail = `guest-${guestId}@guest.vrixo.local`;
+  const normalizedPhone = phone ? normalizeIndianMobileNumber(phone) : null;
+  const lowerEmail = email.toLowerCase().trim();
 
-  const { data: createdUser, error: createUserError } = await supabase.auth.admin.createUser({
-    id: guestId,
-    email: authEmail,
-    email_confirm: true,
-    user_metadata: {
-      name: customerName,
-      phone: customerPhone,
-      checkoutEmail: orderEmail,
-      guestCheckout: true
-    }
-  });
-
-  if (createUserError || !createdUser.user) {
-    throw new Error(createUserError?.message ?? "Guest customer could not be created.");
+  if (!lowerEmail) {
+    throw new Error("Email is required for checkout.");
   }
 
-  const { error: profileError } = await upsertGuestProfile({
-    supabase,
-    id: createdUser.user.id,
-    name: customerName,
-    email: authEmail,
-    phone: customerPhone
+  // 1. Check profiles by email (fast, indexed)
+  const { data: existingByEmail, error: emailLookupError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", lowerEmail)
+    .limit(1)
+    .maybeSingle();
+
+  if (emailLookupError) {
+    console.warn("[ensureCheckoutUser] profiles_email_lookup_error", emailLookupError.message);
+  }
+
+  if (existingByEmail?.id) {
+    return { userId: existingByEmail.id, isNewUser: false };
+  }
+
+  // 2. Create new auth user with real email + random password
+  const tempPassword = generateTempPassword();
+
+  const { data: created, error: createError } = await supabase.auth.admin.createUser({
+    email: lowerEmail,
+    password: tempPassword,
+    email_confirm: true,
+    user_metadata: { name, phone: normalizedPhone || "", checkoutCreated: true },
   });
 
+  if (createError || !created?.user) {
+    const msg = createError?.message ?? "";
+    console.warn("[ensureCheckoutUser] createUser_failed", { email: lowerEmail, error: msg });
+
+    if (msg.toLowerCase().includes("already")) {
+      // User already exists in auth but not in profiles — try profiles lookup again
+      const { data: retryProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", lowerEmail)
+        .limit(1)
+        .maybeSingle();
+
+      if (retryProfile?.id) {
+        return { userId: retryProfile.id, isNewUser: false };
+      }
+
+      // Create profile for existing auth user — we need the user ID
+      // Use a direct query to find by email
+      const { data: authUser } = await supabase.auth.admin.getUserById(created?.user?.id ?? "");
+      if (authUser?.user) {
+        await supabase.from("profiles").upsert({
+          id: authUser.user.id, name, email: lowerEmail,
+          phone: normalizedPhone || "", role: "customer", is_active: true,
+        }, { onConflict: "id" });
+        return { userId: authUser.user.id, isNewUser: false };
+      }
+
+      // Last resort — throw with descriptive message
+      throw new Error("Account exists but could not be accessed. Please login first.");
+    }
+    throw new Error(msg || "Could not create customer account.");
+  }
+
+  // 3. Upsert profile
+  const { error: profileError } = await supabase.from("profiles").upsert({
+    id: created.user.id, name, email: lowerEmail,
+    phone: normalizedPhone || "", role: "customer", is_active: true,
+  }, { onConflict: "id" });
+
   if (profileError) {
+    console.error("[ensureCheckoutUser] profile_upsert_failed", profileError.message);
+    await supabase.auth.admin.deleteUser(created.user.id).catch(() => null);
     throw new Error(profileError.message);
   }
 
-  return {
-    id: createdUser.user.id,
-    authEmail,
-    orderEmail
-  };
+  return { userId: created.user.id, isNewUser: true, tempPassword };
 }
 
-async function upsertGuestProfile({
-  supabase,
-  id,
-  name,
-  email,
-  phone
-}: {
-  supabase: ReturnType<typeof createAdminClient>;
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-}) {
-  const customerRoleResult = await supabase.from("profiles").upsert({
-    id,
-    name,
-    email,
-    phone,
-    role: "customer",
-    is_active: true
-  });
-
-  if (!customerRoleResult.error) {
-    return customerRoleResult;
+function generateTempPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  let password = "";
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  for (let i = 0; i < 16; i++) {
+    password += chars[bytes[i] % chars.length];
   }
-
-  return customerRoleResult;
+  return password;
 }

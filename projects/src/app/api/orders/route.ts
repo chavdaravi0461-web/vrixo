@@ -514,7 +514,6 @@ async function runSecondaryOrderWrites({
 
       const itemRows = snapshotItems.map((item) => ({
         order_id: orderId,
-        product_id: isValidUuid(item.productId) ? item.productId : null,
         title: String(item.title ?? ""),
         sku: String(item.sku ?? ""),
         price: Number(item.price ?? 0),
