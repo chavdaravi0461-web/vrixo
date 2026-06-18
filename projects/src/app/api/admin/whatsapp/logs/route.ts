@@ -13,6 +13,6 @@ export async function GET(request: Request) {
     const rows = await getWhatsAppRecentLogs(200);
     return NextResponse.json({ data: rows });
   } catch (err) {
-    return NextResponse.json({ message: "Failed to fetch logs", error: String(err) }, { status: 500 });
+    return NextResponse.json({ message: "Failed to fetch logs" }, { status: 500 });
   }
 }

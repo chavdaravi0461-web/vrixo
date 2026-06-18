@@ -16,7 +16,8 @@ import { defaultShippingSettings, getShippingSettings } from "@/lib/shipping-set
 import { buildOrderSnapshotFromProducts } from "@/lib/server-order-utils";
 import { runPostOrderTasks } from "@/services/orders/post-order-tasks";
 import { sanitizeCustomerPhone } from "@/lib/whatsapp/phone";
-import { sendOrderConfirmationWhatsApp, formatWhatsAppPhone, hasWhatsAppServerEnv } from "@/lib/whatsapp";
+import { hasEmailEnv, sendEmail } from "@/lib/email";
+import { buildOrderConfirmationEmailHtml } from "@/lib/email-templates/order-confirmation";
 import { getAppUrl } from "@/lib/app-url";
 import { ensureCheckoutUser } from "@/lib/guest-customer";
 import { generateRequestId } from "@/lib/observability";
@@ -103,14 +104,29 @@ export async function POST(request: Request) {
       if (supabaseUser) userId = supabaseUser.id;
     }
 
+    // Verify userId exists in Supabase profiles table (NextAuth/Firebase IDs may not exist there)
+    let tempPassword: string | undefined;
+    if (userId) {
+      const adminCheck = createAdminClient();
+      const { data: existingProfile } = await withTimeout(
+        Promise.resolve(adminCheck.from("profiles").select("id").eq("id", userId).maybeSingle()),
+        800,
+        "Profile lookup timed out."
+      ).catch(() => ({ data: null }));
+
+      if (!existingProfile?.id) {
+        console.warn("[checkout.cod] nextauth_user_not_in_profiles", JSON.stringify({ requestId, userId }));
+        userId = null;
+      }
+    }
+
     const customerName = body.shippingAddress.fullName.trim();
     const customerPhone = sanitizeCustomerPhone(body.shippingAddress.phone);
     if (!customerPhone) {
       return jsonError("Invalid phone number. Please provide a valid 10-digit Indian phone number.", 400, "INVALID_PHONE", requestId, "phone");
     }
 
-    // Auto-create account if not logged in (WooCommerce-style guest checkout)
-    let tempPassword: string | undefined;
+    // Auto-create account if not logged in or userId not in profiles (WooCommerce-style guest checkout)
     if (!userId) {
       try {
         const checkoutUser = await ensureCheckoutUser({
@@ -137,7 +153,8 @@ export async function POST(request: Request) {
         paymentMethod: "cod",
         paymentStatus: "cod_pending",
         orderStatus: "pending",
-        whatsappQueued: true,
+        whatsappQueued: false,
+        emailQueued: true,
         idempotentReplay: true,
         requestId
       });
@@ -191,8 +208,8 @@ export async function POST(request: Request) {
       requestId
     });
 
-    // Fire-and-forget: send WhatsApp directly
-    void fireWhatsAppConfirmation({
+    // Fire-and-forget: send order confirmation email
+    void fireOrderConfirmationEmail({
       orderId: order.order_id,
       orderNumber: order.order_number,
       customerName,
@@ -205,7 +222,7 @@ export async function POST(request: Request) {
       items: cart.snapshotItems,
       shippingAddress: body.shippingAddress,
     }).catch((err) => {
-      console.error("[checkout.cod] fireWhatsAppConfirmation_unhandled", JSON.stringify({ requestId, orderId: order.order_id, error: String(err?.message ?? err) }));
+      console.error("[checkout.cod] fireOrderConfirmationEmail_unhandled", JSON.stringify({ requestId, orderId: order.order_id, error: String(err?.message ?? err) }));
     });
 
     // Fire-and-forget: background tasks
@@ -260,21 +277,37 @@ export async function POST(request: Request) {
       orderStatus: "pending",
       shippingCharge,
       total,
-      whatsappQueued: true,
+      whatsappQueued: false,
+      emailQueued: true,
       requestId
     });
   } catch (error: any) {
     const durationMs = Math.round(performance.now() - startedAt);
     const message = toErrorMessage(error);
-    console.error("[checkout.cod] request_failed", JSON.stringify({ requestId, durationMs, error: message }));
-    return jsonError("Something went wrong. Please try again.", 500, resolveErrorCode(message), requestId);
+    const errorCode = resolveErrorCode(message);
+    console.error("[checkout.cod] request_failed", JSON.stringify({
+      requestId,
+      durationMs,
+      error: message,
+      code: errorCode,
+      name: error?.name,
+      stack: error?.stack?.split("\n").slice(0, 5),
+    }));
+    const publicMessage = resolvePublicErrorMessage(message);
+    return jsonError(publicMessage, 500, errorCode, requestId);
   }
 }
 
 async function safeRequestJson(request: Request) {
   try {
-    return await request.json();
-  } catch {
+    const body = await request.json();
+    if (!body || typeof body !== "object") {
+      console.warn("[checkout.cod] body_not_object");
+      return null;
+    }
+    return body;
+  } catch (e: any) {
+    console.warn("[checkout.cod] body_parse_error", JSON.stringify({ error: e?.message }));
     return null;
   }
 }
@@ -631,7 +664,7 @@ function toErrorMessage(error: unknown) {
   return String(error);
 }
 
-async function fireWhatsAppConfirmation(input: {
+async function fireOrderConfirmationEmail(input: {
   orderId: string; orderNumber: string; customerName: string;
   customerPhone: string; customerEmail: string; orderStatus: string;
   paymentMethod: "cod" | "online"; paymentStatus: string; total: number;
@@ -639,27 +672,29 @@ async function fireWhatsAppConfirmation(input: {
   shippingAddress: Record<string, unknown>;
 }) {
   try {
-    console.log("[order.whatsapp] started", JSON.stringify({ orderId: input.orderId, orderNumber: input.orderNumber, phone: input.customerPhone }));
-    if (!hasWhatsAppServerEnv()) {
-      console.warn("[order.whatsapp] env_missing", JSON.stringify({ orderId: input.orderId }));
+    console.log("[order.email] started", JSON.stringify({ orderId: input.orderId, orderNumber: input.orderNumber, email: input.customerEmail }));
+    if (!hasEmailEnv()) {
+      console.warn("[order.email] env_missing", JSON.stringify({ orderId: input.orderId }));
       return;
     }
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || getAppUrl();
-    const productNames = input.items.map(i => String(i.title ?? i.name ?? "")).filter(Boolean).join(", ") || "Vrixo product";
-    const totalQty = input.items.reduce((s, i) => s + (typeof i.quantity === "number" ? i.quantity : 1), 0);
-    const firstItem = input.items[0] || {};
-    const rawImage = String(firstItem.image ?? firstItem.productImageUrl ?? "");
-    const productImageUrl = rawImage ? (() => { try { return new URL(rawImage, appUrl).toString(); } catch { return `${appUrl}/placeholder-product.svg`; } })() : `${appUrl}/placeholder-product.svg`;
-    const addr = input.shippingAddress as Record<string, unknown>;
-    const deliveryAddress = addr ? [addr.line1, addr.line2, addr.city, addr.state, addr.postalCode, addr.country].map(p => p ? String(p).trim() : "").filter(Boolean).join(", ") : "";
-    const result = await sendOrderConfirmationWhatsApp({
-      customerName: input.customerName, customerPhone: input.customerPhone,
-      orderNumber: input.orderNumber, productNames, totalQty, totalAmount: input.total,
-      orderStatus: input.orderStatus, paymentMethod: input.paymentMethod,
-      paymentStatus: input.paymentStatus, productImageUrl, deliveryAddress,
+    if (!input.customerEmail) {
+      console.warn("[order.email] no_email", JSON.stringify({ orderId: input.orderId }));
+      return;
+    }
+    const result = await sendEmail({
+      to: input.customerEmail,
+      subject: `Order Confirmed — ${input.orderNumber}`,
+      html: buildOrderConfirmationEmailHtml({
+        customerName: input.customerName,
+        orderNumber: input.orderNumber,
+        items: input.items,
+        total: input.total,
+        paymentMethod: input.paymentMethod,
+        shippingAddress: input.shippingAddress
+      })
     });
-    console.log("[order.whatsapp] completed", JSON.stringify({ orderId: input.orderId, sent: result.sent, error: result.error, messageId: result.customerMessageId }));
+    console.log("[order.email] completed", JSON.stringify({ orderId: input.orderId, sent: result.sent, error: result.error }));
   } catch (error: any) {
-    console.error("[order.whatsapp] confirmation_failed", JSON.stringify({ orderId: input.orderId, error: String(error?.message ?? error), stack: error?.stack }));
+    console.error("[order.email] confirmation_failed", JSON.stringify({ orderId: input.orderId, error: String(error?.message ?? error), stack: error?.stack }));
   }
 }

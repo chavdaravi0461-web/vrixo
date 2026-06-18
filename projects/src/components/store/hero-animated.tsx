@@ -12,7 +12,7 @@ import type { Product } from "@/types/index";
 
 const slides = [
   {
-    subtitle: "Private edit — 2026",
+    subtitle: "stock repeated ",
     title: ["Step Into", "Luxury"],
     desc: "Premium shoes and watches selected for sharp silhouettes, confident detail, and instant ownership appeal.",
     cta: "Explore collection",

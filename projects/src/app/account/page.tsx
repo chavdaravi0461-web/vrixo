@@ -48,36 +48,48 @@ export default function AccountPage() {
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
-    const supabase = createBrowserSupabaseClient();
+    let active = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.push("/login?callbackUrl=/account");
-        return;
-      }
+    try {
+      const supabase = createBrowserSupabaseClient();
 
-      const u = session.user;
-      setUser({
-        id: u.id,
-        email: u.email || "",
-        name: u.user_metadata?.name || u.email?.split("@")[0] || "User",
-        phone: u.user_metadata?.phone || "",
-        avatar_url: u.user_metadata?.avatar_url,
-        created_at: u.created_at,
+      supabase.auth.getSession().then(({ data: { session }, error }) => {
+        if (!active) return;
+        if (error || !session) {
+          router.push("/login?callbackUrl=/account");
+          return;
+        }
+
+        const u = session.user;
+        setUser({
+          id: u.id,
+          email: u.email || "",
+          name: u.user_metadata?.name || u.email?.split("@")[0] || "User",
+          phone: u.user_metadata?.phone || "",
+          avatar_url: u.user_metadata?.avatar_url,
+          created_at: u.created_at,
+        });
+
+        fetch("/api/user/profile").then(r => r.json()).then(d => {
+          if (active && d?.name) setUser(prev => prev ? { ...prev, name: d.name, phone: d.phone || prev.phone } : prev);
+        }).catch(() => {});
+
+        fetch("/api/orders").then(r => r.json()).then(d => {
+          if (!active) return;
+          const orders = Array.isArray(d) ? d : d?.orders || [];
+          setRecentOrders(orders.slice(0, 5));
+          setStats(prev => ({ ...prev, orders: orders.length }));
+        }).catch(() => {});
+
+        setLoading(false);
+      }).catch(() => {
+        if (active) router.push("/login?callbackUrl=/account");
       });
+    } catch {
+      if (active) router.push("/login?callbackUrl=/account");
+    }
 
-      fetch("/api/user/profile").then(r => r.json()).then(d => {
-        if (d?.name) setUser(prev => prev ? { ...prev, name: d.name, phone: d.phone || prev.phone } : prev);
-      }).catch(() => {});
-
-      fetch("/api/orders").then(r => r.json()).then(d => {
-        const orders = Array.isArray(d) ? d : d?.orders || [];
-        setRecentOrders(orders.slice(0, 5));
-        setStats(prev => ({ ...prev, orders: orders.length }));
-      }).catch(() => {});
-
-      setLoading(false);
-    });
+    return () => { active = false; };
   }, [router]);
 
   async function handleSignOut() {

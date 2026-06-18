@@ -359,7 +359,7 @@ export const POST = safeRoute(async function POST(request: Request) {
     return NextResponse.json({ ok: true, processed: statuses.length });
   } catch (err) {
     console.error("[whatsapp-webhook] processing error", err instanceof Error ? err.message : String(err));
-    return NextResponse.json({ message: "failed", error: String(err) }, { status: 500 });
+    return NextResponse.json({ message: "failed" }, { status: 500 });
   }
 });
 

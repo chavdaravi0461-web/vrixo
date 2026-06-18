@@ -1,32 +1,34 @@
 import { NextResponse } from "next/server";
-import { sendOrderConfirmationWhatsApp, hasWhatsAppServerEnv, getWhatsAppServerEnv } from "@/lib/whatsapp";
+import { sendOrderConfirmationWhatsApp, hasWhatsAppServerEnv } from "@/lib/whatsapp";
+import { requireAdminApi } from "@/lib/require-admin";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const env = getWhatsAppServerEnv();
-    const hasEnv = hasWhatsAppServerEnv();
+    const authResult = await requireAdminApi(request);
+    if (!authResult.ok) return authResult.response;
 
-    const diagnostics: Record<string, unknown> = {
-      hasWhatsAppEnv: hasEnv,
-      hasToken: Boolean(env.WHATSAPP_CLOUD_API_TOKEN),
-      tokenLength: env.WHATSAPP_CLOUD_API_TOKEN?.length || 0,
-      tokenPrefix: env.WHATSAPP_CLOUD_API_TOKEN?.slice(0, 10) || "none",
-      phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || "missing",
-      adminNumber: env.WHATSAPP_ADMIN_NUMBER || "missing",
-      templateLanguage: env.WHATSAPP_TEMPLATE_LANGUAGE || "missing",
-      graphApiVersion: env.WHATSAPP_GRAPH_API_VERSION || "missing",
-    };
+    const hasEnv = hasWhatsAppServerEnv();
 
     if (!hasEnv) {
       return NextResponse.json({
         status: "ERROR",
-        message: "WhatsApp env vars missing",
-        diagnostics
+        message: "WhatsApp env vars missing"
       }, { status: 500 });
     }
 
-    // Try sending a test message to admin
-    const testPhone = env.WHATSAPP_ADMIN_NUMBER || "919023345354";
+    const env = {
+      WHATSAPP_ADMIN_NUMBER: process.env.WHATSAPP_ADMIN_NUMBER || "",
+      WHATSAPP_TEMPLATE_LANGUAGE: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en"
+    };
+
+    const testPhone = env.WHATSAPP_ADMIN_NUMBER;
+    if (!testPhone) {
+      return NextResponse.json({
+        status: "ERROR",
+        message: "Admin phone number not configured"
+      }, { status: 500 });
+    }
+
     const result = await sendOrderConfirmationWhatsApp({
       customerName: "Test Customer",
       customerPhone: testPhone,
@@ -43,15 +45,12 @@ export async function GET() {
 
     return NextResponse.json({
       status: result.sent ? "SUCCESS" : "FAILED",
-      message: result.sent ? "WhatsApp sent!" : `Failed: ${result.error}`,
-      result,
-      diagnostics
+      message: result.sent ? "WhatsApp sent!" : "Failed to send"
     });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({
       status: "ERROR",
-      message: error?.message || "Unknown error",
-      stack: error?.stack
+      message: "Something went wrong"
     }, { status: 500 });
   }
 }

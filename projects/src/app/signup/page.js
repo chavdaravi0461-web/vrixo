@@ -6,9 +6,10 @@ import Link from "next/link";
 
 export const metadata = { title: "Sign up - Vrixo" };
 
-export default async function SignupPage() {
+export default async function SignupPage({ searchParams }) {
   const session = await getServerSession(authOptions);
-  if (session) redirect("/shop");
+  const params = await searchParams;
+  if (session) redirect(params?.callbackUrl || "/account");
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-primary)", padding: "20px" }}>

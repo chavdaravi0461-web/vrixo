@@ -547,6 +547,14 @@ async function withWhatsAppRetries<T>(label: string, task: () => Promise<T>) {
 export async function sendOrderConfirmationWhatsApp(
   payload: WhatsAppCustomerPayload
 ): Promise<WhatsAppSendResult> {
+  if (process.env.WHATSAPP_DISABLED === "true") {
+    return {
+      sent: false,
+      provider: "whatsapp",
+      error: "WhatsApp is disabled.",
+      adminNotified: false
+    };
+  }
   whatsappLog("info", "order_confirmation.started", {
     orderNumber: payload.orderNumber,
     paymentMethod: payload.paymentMethod,

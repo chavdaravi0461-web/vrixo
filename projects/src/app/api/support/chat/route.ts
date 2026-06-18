@@ -1,6 +1,8 @@
 import { streamAIResponse } from "@/lib/ai/provider";
 
 const SESSION_WINDOW = 30 * 60 * 1000;
+const RATE_LIMIT_WINDOW = 60 * 1000;
+const RATE_LIMIT_MAX = 15;
 
 interface SessionStore {
   [sessionId: string]: {
@@ -10,6 +12,18 @@ interface SessionStore {
 }
 
 const sessions: SessionStore = {};
+const rateLimits: Record<string, { count: number; resetAt: number }> = {};
+
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const current = rateLimits[key];
+  if (!current || current.resetAt <= now) {
+    rateLimits[key] = { count: 1, resetAt: now + RATE_LIMIT_WINDOW };
+    return false;
+  }
+  current.count += 1;
+  return current.count > RATE_LIMIT_MAX;
+}
 
 function getSession(sessionId: string) {
   const now = Date.now();
@@ -39,6 +53,15 @@ function safeParseBody(text: string) {
 
 export async function POST(request: Request) {
   const start = Date.now();
+
+  // Rate limit by IP
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
+  if (checkRateLimit(`support-chat:${ip}`)) {
+    return new Response(JSON.stringify({ message: "Too many messages. Please wait a moment." }), {
+      status: 429,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
 
   try {
     const bodyText = await request.text();

@@ -11,11 +11,14 @@ import { isSupabaseConfigured } from "@/lib/utils";
 import { serverError } from "@/lib/api-response";
 import { safeRoute } from "@/lib/safe-route";
 
+import { sanitizeRedirectPath } from "@/lib/safe-navigation";
+
 const verifyOtpSchema = z.object({
   name: z.string().trim().max(120).optional(),
   phone: z.string().trim().min(1, "Mobile number is required."),
   otp: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit OTP."),
-  mode: z.enum(["login", "signup"]).default("signup")
+  mode: z.enum(["login", "signup"]).default("signup"),
+  next: z.string().trim().max(500).optional()
 });
 
 export const POST = safeRoute(async function POST(request: NextRequest) {
@@ -51,7 +54,7 @@ export const POST = safeRoute(async function POST(request: NextRequest) {
 
   const response = NextResponse.json({
     success: true,
-    redirectTo: "/shop"
+    redirectTo: sanitizeRedirectPath(parsed.data.next, "/account")
   });
 
   const routeSupabase = createRouteHandlerSupabaseClient(request, response);

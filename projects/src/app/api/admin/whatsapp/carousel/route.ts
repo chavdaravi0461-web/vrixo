@@ -22,6 +22,6 @@ export const POST = safeRoute(async function POST(request: Request) {
     await sendWhatsAppProductCarousel({ to: phone, products, token: env.WHATSAPP_CLOUD_API_TOKEN, phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID, caption });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ message: "failed", error: String(err) }, { status: 500 });
+    return NextResponse.json({ message: "failed" }, { status: 500 });
   }
 });

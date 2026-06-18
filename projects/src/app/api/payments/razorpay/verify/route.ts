@@ -181,7 +181,11 @@ export const POST = safeRoute(async function POST(request: Request) {
     .update(`${body.razorpayOrderId}|${body.razorpayPaymentId}`)
     .digest("hex");
 
-  if (generatedSignature !== body.razorpaySignature) {
+  const sigBuffer = Buffer.from(generatedSignature, "utf8");
+  const bodyBuffer = Buffer.from(body.razorpaySignature, "utf8");
+  const signatureValid = sigBuffer.length === bodyBuffer.length && crypto.timingSafeEqual(sigBuffer, bodyBuffer);
+
+  if (!signatureValid) {
     securityLog("razorpay.verify.signature_failed", { orderId: pendingOrder.id });
     logWarn("verify.signature_failed", { requestId, orderId: pendingOrder.id });
     await markOnlinePaymentFailed(adminSupabase, pendingOrder.id, body);
@@ -380,7 +384,7 @@ export const POST = safeRoute(async function POST(request: Request) {
     paymentMethod: "online",
     paymentStatus: "paid",
     orderStatus: "confirmed",
-    whatsappQueued: true,
+    emailQueued: true,
     requestId
   });
 });

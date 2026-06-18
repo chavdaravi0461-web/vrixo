@@ -44,11 +44,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Failed to generate reset link. Please try again." }, { status: 500 });
     }
 
-    // Supabase uses project's Site URL for redirect_to — override localhost with production URL
+    // Supabase uses project's Site URL for redirect_to — override with our reset page
     const actionLink = linkData.properties.action_link;
-    const resetUrl = actionLink
-      .replace(/redirect_to=http:\/\/localhost:\d+/, `redirect_to=${encodeURIComponent(siteUrl + "/reset-password")}`)
-      .replace(/redirect_to=http:\/\/127\.0\.0\.1:\d+/, `redirect_to=${encodeURIComponent(siteUrl + "/reset-password")}`);
+    const encodedRedirect = encodeURIComponent(siteUrl + "/reset-password");
+    let resetUrl = actionLink;
+
+    // Replace any existing redirect_to parameter with our reset-password URL
+    if (resetUrl.includes("redirect_to=")) {
+      resetUrl = resetUrl.replace(/redirect_to=[^&]+/, `redirect_to=${encodedRedirect}`);
+    } else {
+      // Append redirect_to if not present
+      resetUrl += (resetUrl.includes("?") ? "&" : "?") + `redirect_to=${encodedRedirect}`;
+    }
 
     if (channel === "email") {
       if (!hasEmailEnv()) {

@@ -55,6 +55,6 @@ export const POST = safeRoute(async function POST(request: Request) {
 
     return NextResponse.json({ transcript, products: products ?? [] });
   } catch (err) {
-    return NextResponse.json({ message: "failed", error: String(err) }, { status: 500 });
+    return NextResponse.json({ message: "failed" }, { status: 500 });
   }
 });

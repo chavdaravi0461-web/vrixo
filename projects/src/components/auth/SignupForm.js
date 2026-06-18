@@ -67,7 +67,7 @@ export function SignupForm() {
       }
 
       setSuccess("Account created! Signing you in...");
-      router.push(data.redirectTo || "/shop");
+      router.push(data.redirectTo || "/account");
       router.refresh();
     } catch (err) {
       setFormError("Something went wrong. Please try again.");

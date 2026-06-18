@@ -7,6 +7,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const list = await recommendSimilar(id);
     return NextResponse.json({ data: list });
   } catch (err) {
-    return NextResponse.json({ message: "failed", error: String(err) }, { status: 500 });
+    return NextResponse.json({ message: "failed" }, { status: 500 });
   }
 }

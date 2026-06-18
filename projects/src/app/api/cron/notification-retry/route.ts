@@ -30,7 +30,7 @@ async function handler(request: Request) {
       error: error instanceof Error ? error.message : String(error)
     });
     return NextResponse.json(
-      { message: "Retry processing failed", error: error instanceof Error ? error.message : String(error) },
+      { message: "Retry processing failed" },
       { status: 500 }
     );
   }

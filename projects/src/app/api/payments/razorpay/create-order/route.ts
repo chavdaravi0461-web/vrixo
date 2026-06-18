@@ -95,8 +95,18 @@ export const POST = safeRoute(async function POST(request: Request) {
     error?: { description?: string };
   };
 
-  let checkoutUser = user
-    ? { id: user.id, email: user.email ?? body.email ?? "" }
+  // Verify Supabase user exists in profiles table (NextAuth/Firebase IDs may not exist there)
+  let validUserId = user?.id || null;
+  if (validUserId) {
+    const adminCheck = createAdminClient();
+    const { data: existingProfile } = await adminCheck.from("profiles").select("id").eq("id", validUserId).maybeSingle();
+    if (!existingProfile?.id) {
+      validUserId = null;
+    }
+  }
+
+  let checkoutUser = validUserId
+    ? { id: validUserId, email: user?.email ?? body.email ?? "" }
     : null;
 
   let tempPassword: string | undefined;

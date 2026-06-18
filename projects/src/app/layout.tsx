@@ -7,6 +7,7 @@ import "@/styles/commerce-os.css";
 import { Providers } from "@/components/providers";
 import { SessionProvider } from "@/components/auth/SessionProvider";
 import { BackgroundEffects } from "@/components/store/background-effects";
+import { HashRecoveryRedirect } from "@/components/auth/hash-recovery-redirect";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <Providers>
           <SessionProvider>
+            <HashRecoveryRedirect />
             <BackgroundEffects />
             {children}
           </SessionProvider>

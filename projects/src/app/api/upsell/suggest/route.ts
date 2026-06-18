@@ -23,6 +23,6 @@ export async function POST(request: Request) {
     const offers = await generateUpsellOffers(items);
     return NextResponse.json({ data: offers });
   } catch (err) {
-    return NextResponse.json({ message: "failed", error: String(err) }, { status: 500 });
+    return NextResponse.json({ message: "failed" }, { status: 500 });
   }
 }

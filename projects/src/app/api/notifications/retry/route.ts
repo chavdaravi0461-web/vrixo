@@ -32,7 +32,7 @@ async function handler(request: Request) {
       error: error instanceof Error ? error.message : String(error)
     });
     return NextResponse.json(
-      { message: "Notification retry processing failed.", details: error instanceof Error ? error.message : String(error) },
+      { message: "Notification retry processing failed." },
       { status: 500 }
     );
   }

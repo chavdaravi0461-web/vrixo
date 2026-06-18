@@ -16,6 +16,6 @@ export async function POST(request: Request) {
     await publishRealtime("realtime:commands", { command: cmd, payload, issuedBy: "server", createdAt: new Date().toISOString() });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ message: "failed", error: String(err) }, { status: 500 });
+    return NextResponse.json({ message: "failed" }, { status: 500 });
   }
 }

@@ -19,15 +19,15 @@ function ResetPasswordInner() {
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState("");
   const [userEmail, setUserEmail] = useState("");
+  const [accessToken, setAccessToken] = useState("");
 
   useEffect(() => {
     const code = searchParams.get("code");
     const tokenHash = searchParams.get("token_hash");
     const type = searchParams.get("type");
-    const accessToken = searchParams.get("access_token");
-    const refreshToken = searchParams.get("refresh_token");
+    const accessTokenParam = searchParams.get("access_token");
+    const refreshTokenParam = searchParams.get("refresh_token");
 
-    // Method 1: PKCE code exchange
     if (code) {
       const supabase = createBrowserSupabaseClient();
       supabase.auth.exchangeCodeForSession(code).then(({ data: sessionData, error: exchangeError }) => {
@@ -37,6 +37,7 @@ function ResetPasswordInner() {
         } else {
           setVerified(true);
           setUserEmail(sessionData?.session?.user?.email || "");
+          setAccessToken(sessionData?.session?.access_token || "");
           window.history.replaceState({}, "", "/reset-password");
         }
         setVerifying(false);
@@ -44,7 +45,6 @@ function ResetPasswordInner() {
       return;
     }
 
-    // Method 2: Hash fragment tokens (older Supabase magic links)
     if (typeof window !== "undefined" && window.location.hash) {
       const hash = window.location.hash.substring(1);
       const params = new URLSearchParams(hash);
@@ -62,6 +62,7 @@ function ResetPasswordInner() {
           } else {
             setVerified(true);
             setUserEmail(sessionData?.session?.user?.email || "");
+            setAccessToken(sessionData?.session?.access_token || hashAccessToken);
           }
           setVerifying(false);
         });
@@ -69,30 +70,30 @@ function ResetPasswordInner() {
       }
     }
 
-    // Method 3: Query param tokens
-    if (accessToken && refreshToken) {
+    if (accessTokenParam && refreshTokenParam) {
       const supabase = createBrowserSupabaseClient();
       supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
+        access_token: accessTokenParam,
+        refresh_token: refreshTokenParam,
       }).then(({ data: sessionData, error }) => {
         if (error) {
           setError("Invalid or expired reset link. Please request a new one.");
         } else {
           setVerified(true);
           setUserEmail(sessionData?.session?.user?.email || "");
+          setAccessToken(sessionData?.session?.access_token || accessTokenParam);
         }
         setVerifying(false);
       });
       return;
     }
 
-    // No auth params — check if already logged in
     const supabase = createBrowserSupabaseClient();
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setVerified(true);
         setUserEmail(session.user?.email || "");
+        setAccessToken(session.access_token || "");
       } else {
         setError("No reset link found. Please request a new one.");
       }
@@ -117,7 +118,7 @@ function ResetPasswordInner() {
       const res = await fetch("/api/auth/update-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, email: userEmail }),
+        body: JSON.stringify({ password, accessToken }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);

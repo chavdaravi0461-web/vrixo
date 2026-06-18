@@ -314,7 +314,7 @@ function FeedItem({ dot, text, time }: { dot: "info" | "success" | "warn" | "dan
     <div className="cos-feed-item">
       <div className={`cos-feed-dot cos-feed-dot-${dot}`} />
       <div>
-        <div className="cos-feed-text" dangerouslySetInnerHTML={{ __html: text }} />
+        <div className="cos-feed-text">{text}</div>
         <div className="cos-feed-time">{time}</div>
       </div>
     </div>
