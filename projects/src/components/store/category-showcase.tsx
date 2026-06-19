@@ -42,14 +42,14 @@ export function CategoryShowcase({ products = [] }: { products?: Product[] }) {
           {cats.map((cat, i) => {
             const img = cat.img ? normalizeProductImage(cat.img.images?.[0]) ?? getFallbackProductImage() : getFallbackProductImage();
             return (
-              <div key={i} className="anim-fade-up" style={{ animationDelay: `${i * 0.1}s` }}>
+              <div key={i} className="anim-fade-up hover-lift" style={{ animationDelay: `${i * 0.1}s` }}>
                 <Link href={cat.href} className="cat-card block">
-                  <Image src={img} alt={cat.title} width={400} height={400} className="w-full h-full object-cover" />
+                  <Image src={img} alt={cat.title} width={400} height={400} className="w-full h-full object-cover" loading="lazy" />
                   <div className="cat-card-overlay" />
                   <div className="cat-card-body">
                     <p className="cat-card-label">{cat.label}</p>
                     <p className="cat-card-title">{cat.title}</p>
-                    <span className="cat-card-link">Shop now <ArrowRight className="h-3 w-3 inline" /></span>
+                    <span className="cat-card-link">Shop now <ArrowRight className="h-3 w-3 inline transition-transform" /></span>
                   </div>
                 </Link>
               </div>

@@ -284,3 +284,91 @@ html, body { background: var(--bg); color: var(--text); font-family: var(--font-
 /* ====== Focus ====== */
 button:focus-visible, a:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border-width: 0; }
+
+/* ====== Premium Additions ====== */
+html { scroll-behavior: smooth; }
+
+/* Skeleton loading */
+.skeleton { background: linear-gradient(90deg, var(--bg-card) 25%, rgba(255,255,255,.04) 50%, var(--bg-card) 75%); background-size: 200% 100%; animation: shimmer 1.8s ease-in-out infinite; border-radius: var(--radius-sm); }
+
+/* Hover lift */
+.hover-lift { transition: transform .4s cubic-bezier(.33,1,.68,1), box-shadow .4s ease; }
+.hover-lift:hover { transform: translateY(-6px); box-shadow: 0 12px 40px rgba(0,0,0,.4); }
+
+/* Text gradient */
+.text-gradient { background: linear-gradient(135deg, var(--text) 0%, var(--accent-secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+/* Premium CTA glow */
+.btn-glow { position: relative; overflow: hidden; }
+.btn-glow::after { content: ""; position: absolute; inset: -2px; border-radius: inherit; background: linear-gradient(135deg, var(--accent), transparent, var(--accent)); opacity: 0; transition: opacity .4s ease; z-index: -1; filter: blur(12px); }
+.btn-glow:hover::after { opacity: .3; }
+
+/* Smooth transitions for all interactive */
+a, button, input, select, textarea { transition: all .25s cubic-bezier(.33,1,.68,1); }
+
+/* Premium product card hover */
+.p-card:hover { border-color: rgba(255,255,255,.1); box-shadow: 0 16px 48px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05); transform: translateY(-4px); }
+.p-card:hover .p-card-image img { transform: scale(1.08); }
+.p-card-badge-featured { background: rgba(245,245,242,.15); color: var(--text); border: 1px solid rgba(255,255,255,.1); }
+
+/* Filter chips premium */
+.filter-chip { padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 500; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-secondary); cursor: pointer; transition: all .25s cubic-bezier(.33,1,.68,1); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.filter-chip:hover { border-color: rgba(255,255,255,.12); color: var(--text); background: rgba(255,255,255,.04); }
+.filter-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.filter-chip .filter-chip-count { font-size: 10px; opacity: .7; }
+
+/* Premium header dropdown */
+.header-dropdown { position: absolute; top: 100%; left: 0; padding-top: 12px; opacity: 0; visibility: hidden; transform: translateY(8px); transition: all .3s cubic-bezier(.33,1,.68,1); }
+.header-dropdown-trigger:hover .header-dropdown { opacity: 1; visibility: visible; transform: translateY(0); }
+
+/* Cart badge bounce */
+@keyframes badge-pop { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+.header-badge.bounce { animation: badge-pop .4s cubic-bezier(.33,1,.68,1); }
+
+/* Mobile menu slide */
+@keyframes slide-in-left { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+.mobile-menu-panel { animation: slide-in-left .4s cubic-bezier(.33,1,.68,1); }
+
+/* Hero progress */
+@keyframes progress-fill { from { width: 0; } to { width: 100%; } }
+.hero-progress-bar { height: 2px; background: var(--accent); border-radius: 1px; animation: progress-fill 5.2s linear; }
+
+/* Category card hover */
+.cat-card:hover .cat-card-body { transform: translateY(-4px); }
+.cat-card-body { transition: transform .4s cubic-bezier(.33,1,.68,1); }
+.cat-card:hover .cat-card-link svg { transform: translateX(4px); }
+.cat-card-link svg { transition: transform .3s ease; }
+
+/* Brand card hover */
+.brand-card:hover img { transform: scale(1.05); }
+.brand-card img { transition: transform .5s cubic-bezier(.33,1,.68,1); }
+
+/* Cart overlay animate */
+.cart-overlay { opacity: 0; animation: fade-in .3s ease forwards; }
+
+/* Free shipping bar */
+.shipping-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.shipping-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-secondary)); border-radius: 2px; transition: width .6s cubic-bezier(.33,1,.68,1); }
+
+/* Step indicator */
+.step-indicator { display: flex; align-items: center; gap: 0; }
+.step-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; border: 2px solid var(--border); color: var(--text-muted); transition: all .3s ease; }
+.step-dot.active { border-color: var(--accent); color: var(--bg); background: var(--accent); }
+.step-dot.done { border-color: var(--accent); color: var(--accent); background: rgba(245,245,242,.1); }
+.step-line { flex: 1; height: 2px; background: var(--border); transition: background .3s ease; }
+.step-line.done { background: var(--accent); }
+
+/* Premium checkout card */
+.payment-option { padding: 16px 20px; border-radius: var(--radius); border: 2px solid var(--border); background: var(--bg-elevated); cursor: pointer; transition: all .25s ease; display: flex; align-items: center; gap: 12px; }
+.payment-option:hover { border-color: rgba(255,255,255,.1); }
+.payment-option.selected { border-color: var(--accent); background: rgba(245,245,242,.05); }
+.payment-option .payment-radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; transition: all .2s ease; }
+.payment-option.selected .payment-radio { border-color: var(--accent); }
+.payment-option.selected .payment-radio::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  .anim-fade-up, .anim-fade-in, .anim-scale-in, .anim-slide-up, .anim-reveal { animation: none; opacity: 1; }
+  .anim-stagger > * { animation: none; opacity: 1; }
+}

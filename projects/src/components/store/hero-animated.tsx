@@ -119,7 +119,7 @@ export function HeroSlider({ products = [] }: { products?: Product[] }) {
               <p className="hero-desc">{slide.desc}</p>
 
               <div className="hero-actions">
-                <Link href={slide.link} className="hero-btn hero-btn-primary">
+                <Link href={slide.link} className="hero-btn hero-btn-primary btn-glow">
                   {slide.cta} <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link href="/shop" className="hero-btn hero-btn-ghost">
@@ -171,10 +171,15 @@ export function HeroSlider({ products = [] }: { products?: Product[] }) {
           <button
             key={item.id}
             type="button"
-            className={`w-[40px] h-[2px] rounded-full transition-all duration-300 ${index === current % productCount ? "bg-[var(--accent)] w-[48px]" : "bg-[var(--border)]"}`}
+            className="group relative"
             onClick={() => setCurrent(index)}
             aria-label={`Show product ${index + 1}`}
-          />
+          >
+            <div className={`h-[2px] rounded-full transition-all duration-300 ${index === current % productCount ? "w-[48px] bg-[var(--accent)]" : "w-[40px] bg-[var(--border)]"}`} />
+            {index === current % productCount && (
+              <div className="absolute inset-0 h-[2px] rounded-full bg-[var(--accent)] origin-left" style={{ animation: "progress-fill 5.2s linear" }} />
+            )}
+          </button>
         ))}
       </div>
     </section>

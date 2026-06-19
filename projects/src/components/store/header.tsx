@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Heart, Menu, Search, ShoppingBag, User, X, Sparkles } from "lucide-react";
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/lib/store/cart-store";
 import { useWishlistStore } from "@/lib/store/wishlist-store";
@@ -73,6 +73,8 @@ export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [cartBounce, setCartBounce] = useState(false);
+  const prevCount = useRef(0);
   const pathname = usePathname();
   const router = useRouter();
   const params = useSearchParams();
@@ -80,6 +82,14 @@ export function Header() {
   const hydrated = useCartStore((s) => s.hasHydrated);
   const wishlist = useWishlistStore((s) => s.ids);
   const count = useMemo(() => items.reduce((t, i) => t + i.quantity, 0), [items]);
+
+  useEffect(() => {
+    if (count > prevCount.current) {
+      setCartBounce(true);
+      setTimeout(() => setCartBounce(false), 400);
+    }
+    prevCount.current = count;
+  }, [count]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -161,7 +171,7 @@ export function Header() {
             <button type="button" className="header-icon" aria-label="Cart" onClick={() => setCartOpen(true)}>
               <ShoppingBag className="h-[18px] w-[18px]" />
               {hydrated && count > 0 && (
-                <span className="header-badge">{count > 9 ? "9+" : count}</span>
+                <span className={`header-badge ${cartBounce ? "bounce" : ""}`}>{count > 9 ? "9+" : count}</span>
               )}
             </button>
             <button type="button" aria-label="AI" className="header-icon max-[1024px]:hidden">
