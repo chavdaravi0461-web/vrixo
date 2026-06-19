@@ -122,7 +122,7 @@ export function Header() {
             <Link href="/home" className={cn("header-nav-item", pathname === "/home" && "!text-[var(--text)]")}>Home</Link>
             {menuItems.map((item) =>
               item.columns.length > 0 ? (
-                <div key={item.label} className="relative">
+                <div key={item.label} className="relative group">
                   <span className="header-nav-item">{item.label}</span>
                   <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                     <div className="glass-strong rounded-[var(--radius)] p-4 min-w-[200px]">

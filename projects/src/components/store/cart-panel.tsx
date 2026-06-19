@@ -38,7 +38,7 @@ export function CartPanel({ open, onClose }: { open: boolean; onClose: () => voi
             </div>
           ) : (
             items.map((item) => (
-              <div key={item.productId} className="cart-item">
+              <div key={`${item.productId}-${item.selectedSize ?? "nosize"}-${item.selectedColor ?? "nocolor"}`} className="cart-item">
                 <div className="cart-item-image">
                   {item.image && <img src={item.image} alt={item.title} />}
                 </div>
@@ -50,8 +50,8 @@ export function CartPanel({ open, onClose }: { open: boolean; onClose: () => voi
                       type="button"
                       className="cart-qty-btn"
                       onClick={() => {
-                        if (item.quantity <= 1) removeItem(item.productId);
-                        else updateQuantity(item.productId, item.quantity - 1);
+                        if (item.quantity <= 1) removeItem(item.productId, item.selectedSize, item.selectedColor);
+                        else updateQuantity(item.productId, item.quantity - 1, item.selectedSize, item.selectedColor);
                       }}
                     >
                       <Minus className="h-3 w-3" />
@@ -61,7 +61,7 @@ export function CartPanel({ open, onClose }: { open: boolean; onClose: () => voi
                       type="button"
                       className="cart-qty-btn"
                       disabled={item.stock ? item.quantity >= item.stock : false}
-                      onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                      onClick={() => updateQuantity(item.productId, item.quantity + 1, item.selectedSize, item.selectedColor)}
                     >
                       <Plus className="h-3 w-3" />
                     </button>

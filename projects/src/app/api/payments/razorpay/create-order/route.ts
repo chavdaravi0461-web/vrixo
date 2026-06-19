@@ -13,6 +13,7 @@ import {
 import { createPublicSupabaseClient } from "@/lib/supabase/public";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route";
 import { getSupabaseSetupHelpMessage } from "@/lib/supabase/setup-errors";
 import { addressSchema } from "@/lib/validations";
 import { secureCartItemsSchema, securityLog } from "@/lib/security";
@@ -241,13 +242,20 @@ export const POST = safeRoute(async function POST(request: Request) {
     }).catch((error) => console.error("[razorpay.create_order] event publish failed", error));
 
     // Auto-sign-in new guest users
+    let razorpaySessionCookies: Array<{ name: string; value: string; options?: Record<string, unknown> }> = [];
     if (tempPassword && body.email) {
       try {
+        const cookieResponse = NextResponse.json(null, { status: 200 });
+        const authSupabase = createRouteHandlerSupabaseClient(
+          request as unknown as import("next/server").NextRequest,
+          cookieResponse
+        );
         await authSupabase.auth.signInWithPassword({ email: body.email, password: tempPassword });
+        razorpaySessionCookies = cookieResponse.cookies.getAll();
       } catch {}
     }
 
-    return NextResponse.json({
+    const razorpayResponse = NextResponse.json({
       success: true,
       orderId: pendingOrder.orderId,
       orderNumber: pendingOrder.orderNumber,
@@ -264,6 +272,10 @@ export const POST = safeRoute(async function POST(request: Request) {
         contact: String(body.shippingAddress.phone ?? "")
       }
     });
+    for (const cookie of razorpaySessionCookies) {
+      razorpayResponse.cookies.set(cookie.name, cookie.value, cookie.options as any);
+    }
+    return razorpayResponse;
   } catch {
     securityLog("razorpay.pending_order_save_failed", {
       reason: "pending_order_save_failed"

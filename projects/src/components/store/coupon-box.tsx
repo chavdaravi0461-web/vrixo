@@ -22,19 +22,24 @@ export function CouponBox({ subtotal }: { subtotal: number }) {
           disabled={loading || !code}
           onClick={async () => {
             setLoading(true);
-            const response = await fetch("/api/coupons", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ code, subtotal })
-            });
-            const payload = await response.json();
-            setLoading(false);
-            if (!response.ok) {
-              toast.error(payload.message ?? "Invalid coupon.");
-              return;
+            try {
+              const response = await fetch("/api/coupons", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code, subtotal })
+              });
+              const payload = await response.json().catch(() => ({ message: "Invalid server response." }));
+              if (!response.ok) {
+                toast.error(payload.message ?? "Invalid coupon.");
+                return;
+              }
+              setCoupon(payload.code, payload.discount);
+              toast.success(`Coupon ${payload.code} applied.`);
+            } catch {
+              toast.error("Network error. Please try again.");
+            } finally {
+              setLoading(false);
             }
-            setCoupon(payload.code, payload.discount);
-            toast.success(`Coupon ${payload.code} applied.`);
           }}
         >
           Apply

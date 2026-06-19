@@ -25,18 +25,22 @@ export function ContactForm() {
     <form
       className="rounded-[2rem] bg-white p-8 card-shadow"
       onSubmit={handleSubmit(async (values) => {
-        const response = await fetch("/api/contact", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(values)
-        });
-        const payload = await response.json();
-        if (!response.ok) {
-          toast.error(payload.message ?? "Failed to send message.");
-          return;
+        try {
+          const response = await fetch("/api/contact", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(values)
+          });
+          const payload = await response.json().catch(() => ({ message: "Invalid server response." }));
+          if (!response.ok) {
+            toast.error(payload.message ?? "Failed to send message.");
+            return;
+          }
+          toast.success("Message sent successfully.");
+          reset();
+        } catch {
+          toast.error("Network error. Please check your connection.");
         }
-        toast.success("Message sent successfully.");
-        reset();
       })}
     >
       <div className="grid gap-4 md:grid-cols-2">

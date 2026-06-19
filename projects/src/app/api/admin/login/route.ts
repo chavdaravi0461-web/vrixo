@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { timingSafeEqual } from "crypto";
 import { isOwnerAdminEmail } from "@/lib/admin-constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route";
@@ -35,7 +36,14 @@ export const POST = safeRoute(async function POST(request: NextRequest) {
   if (!parsed.success) return invalidLogin(request, identifier, "invalid_payload");
 
   const requiredCode = process.env.ADMIN_ACCESS_CODE?.trim();
-  if (requiredCode && parsed.data.accessCode !== requiredCode) return invalidLogin(request, identifier, "bad_access_code");
+  if (requiredCode) {
+    const inputCode = parsed.data.accessCode ?? "";
+    const codeBuf = Buffer.from(inputCode.padEnd(requiredCode.length, "\0"));
+    const requiredBuf = Buffer.from(requiredCode.padEnd(inputCode.length, "\0"));
+    if (codeBuf.length !== requiredBuf.length || !timingSafeEqual(codeBuf, requiredBuf)) {
+      return invalidLogin(request, identifier, "bad_access_code");
+    }
+  }
 
   const email = parsed.data.identifier.includes("@")
     ? parsed.data.identifier.toLowerCase()

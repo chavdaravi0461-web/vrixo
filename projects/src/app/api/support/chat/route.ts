@@ -26,6 +26,7 @@ function checkRateLimit(key: string): boolean {
 }
 
 function getSession(sessionId: string) {
+  pruneIfStale();
   const now = Date.now();
   if (sessions[sessionId] && sessions[sessionId].expiresAt > now) {
     return sessions[sessionId].messages;
@@ -34,14 +35,15 @@ function getSession(sessionId: string) {
   return sessions[sessionId].messages;
 }
 
-function pruneExpiredSessions() {
+let lastPruned = 0;
+function pruneIfStale() {
   const now = Date.now();
+  if (now - lastPruned < 5 * 60 * 1000) return;
+  lastPruned = now;
   for (const key of Object.keys(sessions)) {
     if (sessions[key].expiresAt <= now) delete sessions[key];
   }
 }
-
-setInterval(pruneExpiredSessions, 5 * 60 * 1000);
 
 function safeParseBody(text: string) {
   try {

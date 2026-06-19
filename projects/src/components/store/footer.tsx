@@ -53,7 +53,7 @@ export function Footer() {
         </div>
 
         <div className="footer-bottom">
-          <p>Luxury in every detail — <strong>Vrixo</strong> &copy;2025 to 2026</p>
+          <p>Luxury in every detail — <strong>Vrixo</strong> &copy;2025 to {new Date().getFullYear()}</p>
           <div className="flex gap-4">
             <Link href="/terms-and-conditions" className="footer-link">Terms</Link>
             <Link href="/privacy-policy" className="footer-link">Privacy</Link>

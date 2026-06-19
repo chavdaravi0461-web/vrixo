@@ -8,6 +8,7 @@ import { hasServerSupabaseAdminEnv } from "@/lib/env/server";
 import { createPublicSupabaseClient } from "@/lib/supabase/public";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route";
 import { validateCouponForCheckout } from "@/lib/game-coupons";
 import { addressSchema } from "@/lib/validations";
 import { secureCartItemsSchema } from "@/lib/security";
@@ -247,13 +248,19 @@ export async function POST(request: Request) {
     });
 
     // Auto-sign-in new guest users so they get a session cookie
+    let sessionCookies: Array<{ name: string; value: string; options?: Record<string, unknown> }> = [];
     if (tempPassword && customerEmail) {
       try {
-        const authSupabase = await createServerSupabaseClient();
+        const cookieResponse = NextResponse.json(null, { status: 200 });
+        const authSupabase = createRouteHandlerSupabaseClient(
+          request as unknown as import("next/server").NextRequest,
+          cookieResponse
+        );
         await authSupabase.auth.signInWithPassword({
           email: customerEmail,
           password: tempPassword,
         });
+        sessionCookies = cookieResponse.cookies.getAll();
         console.info("[checkout.cod] auto_signin_success", JSON.stringify({ requestId, email: customerEmail }));
       } catch (error: any) {
         console.warn("[checkout.cod] auto_signin_failed", JSON.stringify({ requestId, error: String(error?.message ?? error) }));
@@ -269,7 +276,7 @@ export async function POST(request: Request) {
       budgetMs: COD_RESPONSE_BUDGET_MS
     }));
 
-    return jsonSuccess({
+    const successResponse = jsonSuccess({
       orderId: order.order_id,
       orderNumber: order.order_number,
       paymentMethod: "cod",
@@ -281,6 +288,10 @@ export async function POST(request: Request) {
       emailQueued: true,
       requestId
     });
+    for (const cookie of sessionCookies) {
+      successResponse.cookies.set(cookie.name, cookie.value, cookie.options as any);
+    }
+    return successResponse;
   } catch (error: any) {
     const durationMs = Math.round(performance.now() - startedAt);
     const message = toErrorMessage(error);

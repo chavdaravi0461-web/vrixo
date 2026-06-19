@@ -55,7 +55,7 @@ export default function GlobalError({
                 Try again
               </button>
               <a
-                href="/home"
+                href="/"
                 style={{
                   borderRadius: "999px",
                   padding: "12px 18px",

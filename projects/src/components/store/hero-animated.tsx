@@ -46,6 +46,27 @@ export function HeroSlider({ products = [] }: { products?: Product[] }) {
     return () => clearInterval(timer);
   }, [reduceMotion, productCount]);
 
+  if (productCount === 0) {
+    return (
+      <section className="hero">
+        <div className="hero-inner">
+          <div className="hero-content">
+            <div className="hero-eyebrow"><span className="hero-dot" />Stock repeated</div>
+            <h1 className="hero-title display display-2xl">
+              <span className="hero-title-line">Step Into</span>
+              <span className="hero-title-line hero-title-accent">Luxury</span>
+            </h1>
+            <p className="hero-desc">Premium shoes and watches selected for sharp silhouettes, confident detail, and instant ownership appeal.</p>
+            <div className="hero-actions">
+              <Link href="/shop" className="hero-btn hero-btn-primary">Explore collection <ArrowRight className="h-4 w-4" /></Link>
+              <Link href="/shop" className="hero-btn hero-btn-ghost">View all</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   const slide = slides[current % slides.length];
   const product = products[current % productCount];
   const heroImageIndex = product?.highlighted && product.specifications?.heroImageIndex

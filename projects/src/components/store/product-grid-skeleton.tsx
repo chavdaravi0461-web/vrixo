@@ -1,6 +1,6 @@
 export function ProductGridSkeleton({ count = 8 }: { count?: number }) {
   return (
-    <div className="dc-grid">
+    <div className="p-grid anim-stagger">
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}

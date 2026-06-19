@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { OrderHistoryCards, type OrderHistoryOrder } from "@/components/store/order-history-cards";
 import { getLocalOrders } from "@/lib/local-orders";
 import type { Order } from "@/types/index";
 
 export function LocalOrdersPageClient() {
-  const [orders] = useState<Order[]>(() =>
-    typeof window === "undefined" ? [] : getLocalOrders()
-  );
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    setOrders(getLocalOrders());
+  }, []);
 
   if (orders.length === 0) {
     return (

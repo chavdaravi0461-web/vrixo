@@ -17,8 +17,8 @@ export function ProductActions({ product }: { product: Product }) {
   const addItem = useCartStore((state) => state.addItem);
   const toggleWishlist = useWishlistStore((state) => state.toggle);
   const wished = useWishlistStore((state) => state.ids.includes(product.id));
-  const [size, setSize] = useState(product.sizes[0] ?? "");
-  const [color, setColor] = useState(product.colors[0] ?? "");
+  const [size, setSize] = useState((product.sizes ?? [])[0] ?? "");
+  const [color, setColor] = useState((product.colors ?? [])[0] ?? "");
   const displayTitle = cleanProductTitle(product.title);
   const selectedColorIndex = product.colors.findIndex((entry) => entry === color);
   const selectedImage = selectedColorIndex >= 0 ? product.images[selectedColorIndex] : product.images[0];
@@ -27,7 +27,7 @@ export function ProductActions({ product }: { product: Product }) {
   return (
     <div className="dc-product-actions mt-8 space-y-6">
       <div className="dc-product-option-grid grid gap-4 md:grid-cols-2">
-        {product.sizes.length > 0 ? (
+        {(product.sizes ?? []).length > 0 ? (
           <div>
             <label className="mb-2 block text-sm font-bold text-[var(--dc-text)]">Select size</label>
             <Select className="rounded-full" value={size} onChange={(event) => setSize(event.target.value)}>
@@ -39,7 +39,7 @@ export function ProductActions({ product }: { product: Product }) {
             </Select>
           </div>
         ) : null}
-        {product.colors.length > 0 ? (
+        {(product.colors ?? []).length > 0 ? (
           <div>
             <label className="mb-2 block text-sm font-bold text-[var(--dc-text)]">Select color</label>
             <Select className="rounded-full" value={color} onChange={(event) => setColor(event.target.value)}>
@@ -129,8 +129,8 @@ export function StickyMobileBar({ product }: { product: Product }) {
   const router = useRouter();
   const addItem = useCartStore((state) => state.addItem);
   const inStock = product.stock > 0;
-  const [size, setSize] = useState(product.sizes[0] ?? "");
-  const [color, setColor] = useState(product.colors[0] ?? "");
+  const [size, setSize] = useState((product.sizes ?? [])[0] ?? "");
+  const [color, setColor] = useState((product.colors ?? [])[0] ?? "");
 
   if (inStock) {
     return (

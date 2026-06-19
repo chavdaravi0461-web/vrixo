@@ -21,6 +21,7 @@ interface Session {
 const sessions = new Map<string, Session>();
 
 function getSession(sessionId: string): Session {
+  pruneSessions();
   const now = Date.now();
   const existing = sessions.get(sessionId);
   if (existing && existing.expiresAt > now) return existing;
@@ -34,12 +35,15 @@ function getSession(sessionId: string): Session {
   return session;
 }
 
-setInterval(() => {
+let lastPruned = 0;
+function pruneSessions() {
   const now = Date.now();
+  if (now - lastPruned < 10 * 60 * 1000) return;
+  lastPruned = now;
   for (const [key, s] of sessions) {
     if (s.expiresAt <= now) sessions.delete(key);
   }
-}, 10 * 60 * 1000);
+}
 
 function clearPendingConfirmation(session: Session): void {
   session.pendingConfirmation = null;

@@ -30,7 +30,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-      if (e.key === "ArrowDown") { e.preventDefault(); setSelected((p) => Math.min(p + 1, results.length - 1)); }
+      if (e.key === "ArrowDown") { e.preventDefault(); setSelected((p) => results.length === 0 ? 0 : Math.min(p + 1, results.length - 1)); }
       if (e.key === "ArrowUp") { e.preventDefault(); setSelected((p) => Math.max(p - 1, 0)); }
       if (e.key === "Enter" && results[selected]) {
         onClose();
