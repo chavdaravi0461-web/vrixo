@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, ShieldCheck, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,10 @@ export function AdminLoginForm() {
   const [accessCode, setAccessCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const [showReset, setShowReset] = useState(false);
+  const [resetNewPw, setResetNewPw] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
 
   async function submitLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,6 +42,44 @@ export function AdminLoginForm() {
       toast.error(error instanceof Error ? error.message : "Admin login failed.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!identifier.includes("@")) {
+      toast.error("Enter your admin email above first.");
+      return;
+    }
+    if (!resetNewPw || resetNewPw.length < 6) {
+      toast.error("New password must be at least 6 characters.");
+      return;
+    }
+    if (!accessCode) {
+      toast.error("Enter your access code above first.");
+      return;
+    }
+
+    try {
+      setResetLoading(true);
+      const res = await fetch("/api/admin/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: identifier.trim().toLowerCase(),
+          newPassword: resetNewPw,
+          accessCode,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      toast.success("Password reset! Now login with your new password.");
+      setPassword(resetNewPw);
+      setResetNewPw("");
+      setShowReset(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Reset failed.");
+    } finally {
+      setResetLoading(false);
     }
   }
 
@@ -69,7 +111,7 @@ export function AdminLoginForm() {
             type={showPassword ? "text" : "password"}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-          className="pr-12"
+            className="pr-12"
             autoComplete="current-password"
             required
           />
@@ -96,6 +138,44 @@ export function AdminLoginForm() {
       <Button type="submit" className="mt-6 h-12 w-full rounded-2xl" disabled={loading}>
         {loading ? "Verifying..." : "Login to admin"}
       </Button>
+
+      <div className="mt-4 border-t border-[var(--os-border)] pt-4">
+        <button
+          type="button"
+          onClick={() => setShowReset(!showReset)}
+          className="flex items-center gap-2 text-xs text-[var(--os-text-3)] hover:text-[var(--os-text)] transition-colors"
+        >
+          <KeyRound className="h-3 w-3" />
+          {showReset ? "Hide reset form" : "Password not working? Reset it here"}
+        </button>
+
+        {showReset && (
+          <div className="mt-3 space-y-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+            <p className="text-[10px] text-amber-400">
+              Enter your email above + access code, then set a new password below.
+            </p>
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-semibold text-[var(--os-text-2)]">New password</span>
+              <Input
+                type="password"
+                value={resetNewPw}
+                onChange={(e) => setResetNewPw(e.target.value)}
+                placeholder="Min 6 characters"
+                autoComplete="new-password"
+              />
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+              onClick={handleResetPassword}
+              disabled={resetLoading}
+            >
+              {resetLoading ? "Resetting..." : "Reset Password"}
+            </Button>
+          </div>
+        )}
+      </div>
     </form>
   );
 }
