@@ -213,7 +213,7 @@ export function CheckoutForm({
                 ref={postalRef}
               />
               {pincodeLoading ? <span style={{ position: "absolute", right: 10, top: 10 }} className="body-sm">Loading...</span> : null}
-              {!pincodeLoading && pincodeResult ? <span style={{ position: "absolute", right: 10, top: 10, color: "#16a34a" }}>✓</span> : null}
+              {!pincodeLoading && pincodeResult ? <span style={{ position: "absolute", right: 10, top: 10, color: "#16a34a", fontSize: "12px", fontWeight: 700 }}>OK</span> : null}
             </div>
           </Field>
           <Field label="Address line 1" error={errors.line1?.message} className="md:col-span-2"><Input {...register("line1")} /></Field>
@@ -260,15 +260,17 @@ export function CheckoutForm({
 
         <div style={{ marginTop: "24px" }}>
           <p className="body-sm" style={{ fontWeight: 500, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: "12px" }}>Payment method</p>
-          <label className="flex cursor-pointer items-start gap-3 rounded-[var(--radius-sm)] p-4 transition hover:border-[var(--accent)]" style={{ border: "1px solid var(--border)", display: "flex" }}>
-            <input type="radio" value="Cash on Delivery" {...register("paymentMethod")} className="mt-1 h-4 w-4" style={{ accentColor: "var(--accent)" }} />
+          <label className="payment-option" style={{ cursor: "pointer" }}>
+            <input type="radio" value="Cash on Delivery" {...register("paymentMethod")} className="sr-only" />
+            <div className="payment-radio" aria-hidden="true" />
             <div>
               <p style={{ fontWeight: 500, color: "var(--text)", fontSize: "13px" }}>Cash on Delivery</p>
               <p className="body-sm" style={{ marginTop: "4px" }}>Pay when your order reaches your doorstep.</p>
             </div>
           </label>
-          <label className="flex cursor-pointer items-start gap-3 rounded-[var(--radius-sm)] p-4 transition hover:border-[var(--accent)]" style={{ border: "1px solid var(--border)", display: "flex", marginTop: "8px" }}>
-            <input type="radio" value="Online Payment" {...register("paymentMethod")} className="mt-1 h-4 w-4" style={{ accentColor: "var(--accent)" }} />
+          <label className="payment-option" style={{ cursor: "pointer", marginTop: "8px" }}>
+            <input type="radio" value="Online Payment" {...register("paymentMethod")} className="sr-only" />
+            <div className="payment-radio" aria-hidden="true" />
             <div>
               <p style={{ fontWeight: 500, color: "var(--text)", fontSize: "13px" }}>Online Payment</p>
               <p className="body-sm" style={{ marginTop: "4px" }}>

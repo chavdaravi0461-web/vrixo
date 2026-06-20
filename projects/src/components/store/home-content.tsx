@@ -75,7 +75,7 @@ export function HomeContent({
             <span className="section-eyebrow">Curated for you</span>
             <h2 className="section-title">Every detail speaks luxury</h2>
             <p className="section-subtitle">
-              From premium materials to precision craftsmanship — each piece is selected for those who refuse to compromise on style.
+              From premium materials to precision craftsmanship, each piece is selected for those who refuse to compromise on style.
             </p>
           </div>
           <div className="text-center anim-fade-up">
@@ -122,7 +122,7 @@ export function HomeContent({
             <blockquote className="display-md" style={{ fontStyle: "italic", fontWeight: 400, maxWidth: "600px", margin: "0 auto", color: "var(--text-secondary)" }}>
               &ldquo;I was just browsing and ended up buying two pairs. The quality exceeded my expectations.&rdquo;
             </blockquote>
-            <footer className="body-sm" style={{ marginTop: "12px" }}>— Verified Customer, Mumbai</footer>
+            <footer className="body-sm" style={{ marginTop: "12px" }}>- Verified Customer, Mumbai</footer>
           </div>
         </div>
       </section>

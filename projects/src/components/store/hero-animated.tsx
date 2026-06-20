@@ -12,14 +12,14 @@ import type { Product } from "@/types/index";
 
 const slides = [
   {
-    subtitle: "stock repeated ",
+    subtitle: "Signature curation",
     title: ["Step Into", "Luxury"],
     desc: "Premium shoes and watches selected for sharp silhouettes, confident detail, and instant ownership appeal.",
     cta: "Explore collection",
     link: "/shop",
   },
   {
-    subtitle: "COD confidence — All India",
+    subtitle: "COD confidence - All India",
     title: ["Wear", "Confidence"],
     desc: "High-desire footwear delivered with easy payment, smooth support, and a polished buying experience.",
     cta: "Shop best sellers",
@@ -51,7 +51,7 @@ export function HeroSlider({ products = [] }: { products?: Product[] }) {
       <section className="hero">
         <div className="hero-inner">
           <div className="hero-content">
-            <div className="hero-eyebrow"><span className="hero-dot" />Stock repeated</div>
+            <div className="hero-eyebrow"><span className="hero-dot" />Signature curation</div>
             <h1 className="hero-title display display-2xl">
               <span className="hero-title-line">Step Into</span>
               <span className="hero-title-line hero-title-accent">Luxury</span>
@@ -152,28 +152,30 @@ export function HeroSlider({ products = [] }: { products?: Product[] }) {
         </div>
       </div>
 
-      <div className="hero-metrics">
+      <div className="hero-metrics" role="list" aria-label="Store statistics">
         {[
           { value: "15K+", label: "Happy Customers" },
           { value: "100+", label: "Premium Styles" },
           { value: "7 Days", label: "Easy Returns" },
           { value: "Free", label: "Shipping All India" },
         ].map((m) => (
-          <div key={m.label} className="hero-metric anim-fade-up">
+          <div key={m.label} className="hero-metric anim-fade-up" role="listitem">
             <div className="hero-metric-value">{m.value}</div>
             <div className="hero-metric-label">{m.label}</div>
           </div>
         ))}
       </div>
 
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 z-10" role="tablist" aria-label="Product slides">
         {products.slice(0, Math.min(productCount, 5)).map((item, index) => (
           <button
             key={item.id}
             type="button"
             className="group relative"
             onClick={() => setCurrent(index)}
-            aria-label={`Show product ${index + 1}`}
+            role="tab"
+            aria-selected={index === current % productCount}
+            aria-label={`Show product ${index + 1}: ${cleanProductTitle(item.title)}`}
           >
             <div className={`h-[2px] rounded-full transition-all duration-300 ${index === current % productCount ? "w-[48px] bg-[var(--accent)]" : "w-[40px] bg-[var(--border)]"}`} />
             {index === current % productCount && (

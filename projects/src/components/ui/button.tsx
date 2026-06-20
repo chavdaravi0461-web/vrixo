@@ -3,22 +3,22 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-none px-5 py-3 text-sm font-black uppercase tracking-[0.08em] transition disabled:cursor-not-allowed disabled:opacity-50",
+  "group relative inline-flex min-h-11 items-center justify-center gap-2 overflow-hidden rounded-full px-5 py-3 text-sm font-semibold tracking-[0.01em] transition-[transform,box-shadow,background,border-color,color,opacity] duration-300 ease-[cubic-bezier(.2,.8,.2,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] active:scale-[0.98] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-45",
   {
     variants: {
       variant: {
         primary:
-          "bg-[var(--dc-bg-deep)] text-white hover:bg-[var(--dc-surface-hover)] focus:outline-none focus:ring-4 focus:ring-[var(--dc-gold)]",
+          "border border-white/10 bg-[linear-gradient(135deg,var(--accent)_0%,#ffffff_48%,var(--accent-secondary)_100%)] text-[var(--bg)] shadow-[var(--shadow-button)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-button-hover)]",
         secondary:
-          "bg-white text-black hover:bg-[var(--dc-gold-dark)] focus:outline-none focus:ring-4 focus:ring-white/30",
+          "border border-white/10 bg-white/10 text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-xl hover:-translate-y-0.5 hover:bg-white/15 hover:shadow-[var(--shadow-soft)]",
         outline:
-          "border border-[var(--dc-border-strong)] bg-[var(--dc-surface)] text-[var(--dc-text)] hover:border-[var(--dc-gold)] hover:bg-[var(--dc-surface-hover)]",
-        ghost: "text-[var(--dc-text)] hover:bg-[var(--dc-surface)]"
+          "border border-[var(--border-strong)] bg-[rgba(255,255,255,.025)] text-[var(--text)] backdrop-blur-xl hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/10 hover:shadow-[var(--shadow-soft)]",
+        ghost: "text-[var(--text-secondary)] hover:bg-white/10 hover:text-[var(--text)]"
       },
       size: {
-        sm: "px-4 py-2 text-xs",
+        sm: "min-h-9 px-4 py-2 text-xs",
         md: "px-5 py-3 text-sm",
-        lg: "px-6 py-3.5 text-base"
+        lg: "min-h-12 px-6 py-3.5 text-base"
       }
     },
     defaultVariants: {

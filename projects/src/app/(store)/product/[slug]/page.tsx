@@ -116,7 +116,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                 </div>
                 <p className="body" style={{ marginTop: "12px", lineHeight: 1.7, color: "var(--text-muted)" }}>{displayDescription}</p>
                 {product.stock > 0 && product.stock <= 5 ? (
-                  <p className="body-sm" style={{ marginTop: "12px", color: "rgba(255,80,80,.8)", fontWeight: 600 }}>Only {product.stock} left in stock — order soon</p>
+                  <p className="body-sm" style={{ marginTop: "12px", color: "rgba(255,80,80,.8)", fontWeight: 600 }}>Only {product.stock} left in stock - order soon</p>
                 ) : null}
                 <div className="grid gap-3 sm:grid-cols-3" style={{ marginTop: "20px" }}>
                   <InfoChip icon={Truck} label="Delivery" value="Fast dispatch" />
@@ -172,7 +172,7 @@ function ProductDetailsAccordions({ description, stock, specifications }: { desc
           <span className="text-lg leading-none transition-transform duration-200 group-open:rotate-45" style={{ color: "var(--text-muted)" }}>+</span>
         </summary>
         <div className="grid gap-3 body-sm" style={{ paddingBottom: "20px" }}>
-          <p><strong>Delivery:</strong> Fast dispatch within 1–2 business days. Free delivery on eligible orders.</p>
+          <p><strong>Delivery:</strong> Fast dispatch within 1-2 business days. Free delivery on eligible orders.</p>
           <p><strong>Returns:</strong> Easy 7-day return policy. Items must be unworn with tags intact. Contact support to initiate.</p>
           <p><strong>Payments:</strong> Cash on Delivery (COD) and secure online payments via Razorpay (UPI, cards, netbanking).</p>
           <p>{stock > 0 ? "Currently available for dispatch." : "This product is currently out of stock."}</p>

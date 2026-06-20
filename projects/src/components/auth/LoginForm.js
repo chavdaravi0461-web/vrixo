@@ -74,7 +74,7 @@ export function LoginForm() {
   return (
     <div className="glass-card" style={{ padding: "40px" }}>
       <div className="text-center mb-8">
-        <h1 style={{ fontSize: "24px", fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
+        <h1 style={{ fontSize: "24px", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>
           Welcome back
         </h1>
         <p style={{ fontSize: "14px", color: "var(--text-secondary)", marginTop: "8px" }}>
@@ -102,13 +102,14 @@ export function LoginForm() {
       <button
         onClick={handleGoogleLogin}
         disabled={isSubmitting}
+        type="button"
         style={{
           width: "100%",
           padding: "14px 20px",
-          borderRadius: "8px",
+          borderRadius: "999px",
           border: "1px solid var(--border)",
-          background: "var(--bg-elevated)",
-          color: "var(--text-primary)",
+          background: "linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.022))",
+          color: "var(--text)",
           fontSize: "15px",
           fontWeight: 500,
           cursor: isSubmitting ? "not-allowed" : "pointer",
@@ -116,11 +117,9 @@ export function LoginForm() {
           alignItems: "center",
           justifyContent: "center",
           gap: "12px",
-          transition: "all 0.2s ease",
+          transition: "all .28s cubic-bezier(.2,.8,.2,1)",
           opacity: isSubmitting ? 0.6 : 1,
         }}
-        onMouseEnter={(e) => { if (!isSubmitting) e.currentTarget.style.background = "var(--card-bg)"; }}
-        onMouseLeave={(e) => { if (!isSubmitting) e.currentTarget.style.background = "var(--bg-elevated)"; }}
       >
         {googleLoading ? (
           <Loader2 size={20} className="animate-spin" />
@@ -164,15 +163,15 @@ export function LoginForm() {
                 padding: "12px 16px",
                 borderRadius: "8px",
                 border: "1px solid var(--border)",
-                background: "var(--bg-primary)",
-                color: "var(--text-primary)",
+                background: "rgba(255,255,255,.035)",
+                color: "var(--text)",
                 fontSize: "14px",
                 outline: "none",
-                transition: "border-color 0.2s",
+                transition: "border-color .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s cubic-bezier(.2,.8,.2,1)",
                 boxSizing: "border-box",
               }}
-              onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-              onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+              onFocus={(e) => { e.target.style.borderColor = "var(--accent)"; e.target.style.boxShadow = "0 0 0 3px var(--accent-ring)"; }}
+              onBlur={(e) => { e.target.style.borderColor = "var(--border)"; e.target.style.boxShadow = "none"; }}
             />
           </div>
           <div>
@@ -194,15 +193,15 @@ export function LoginForm() {
                 padding: "12px 16px",
                 borderRadius: "8px",
                 border: "1px solid var(--border)",
-                background: "var(--bg-primary)",
-                color: "var(--text-primary)",
+                background: "rgba(255,255,255,.035)",
+                color: "var(--text)",
                 fontSize: "14px",
                 outline: "none",
-                transition: "border-color 0.2s",
+                transition: "border-color .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s cubic-bezier(.2,.8,.2,1)",
                 boxSizing: "border-box",
               }}
-              onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-              onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+              onFocus={(e) => { e.target.style.borderColor = "var(--accent)"; e.target.style.boxShadow = "0 0 0 3px var(--accent-ring)"; }}
+              onBlur={(e) => { e.target.style.borderColor = "var(--border)"; e.target.style.boxShadow = "none"; }}
             />
           </div>
         </div>
@@ -222,16 +221,17 @@ export function LoginForm() {
           style={{
             width: "100%",
             padding: "14px 20px",
-            borderRadius: "8px",
-            border: "none",
-            background: "var(--accent)",
-            color: "var(--bg-primary)",
+            borderRadius: "999px",
+            border: "1px solid rgba(255,255,255,.32)",
+            background: "linear-gradient(135deg, var(--accent) 0%, #fff 48%, var(--accent-secondary) 100%)",
+            color: "var(--bg)",
             fontSize: "15px",
             fontWeight: 600,
             cursor: isSubmitting ? "not-allowed" : "pointer",
             marginTop: "20px",
             opacity: isSubmitting ? 0.6 : 1,
-            transition: "opacity 0.2s",
+            transition: "all .28s cubic-bezier(.2,.8,.2,1)",
+            boxShadow: "var(--shadow-button)",
           }}
         >
           {loading ? (

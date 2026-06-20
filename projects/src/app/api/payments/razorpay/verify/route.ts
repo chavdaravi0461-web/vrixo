@@ -6,6 +6,7 @@ import {
   hasRazorpayServerEnv
 } from "@/lib/env/server";
 import { securityLog } from "@/lib/security";
+import { autoSubscribeToNewsletter } from "@/lib/newsletter/auto-subscribe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { checkServerRateLimit } from "@/lib/rate-limit";
@@ -95,6 +96,7 @@ export const POST = safeRoute(async function POST(request: Request) {
     order_status: string;
     customer_name: string;
     customer_phone: string;
+    customer_email: string;
     coupon_code: string | null;
     shipping_address: unknown;
     items: unknown;
@@ -103,7 +105,7 @@ export const POST = safeRoute(async function POST(request: Request) {
   if (body.internalOrderId) {
     const { data } = await adminSupabase
       .from("orders")
-      .select("id, user_id, order_number, total, payment_method, payment_status, order_status, customer_name, customer_phone, coupon_code, shipping_address, items")
+      .select("id, user_id, order_number, total, payment_method, payment_status, order_status, customer_name, customer_phone, customer_email, coupon_code, shipping_address, items")
       .eq("id", body.internalOrderId)
       .in("payment_method", ["online", "Online Payment", "online"])
       .maybeSingle();
@@ -113,7 +115,7 @@ export const POST = safeRoute(async function POST(request: Request) {
   if (!pendingOrder) {
     const { data: paymentOrder } = await adminSupabase
       .from("payments")
-      .select("order_id, orders!inner(id, user_id, order_number, total, payment_method, payment_status, order_status, customer_name, customer_phone, coupon_code, shipping_address, items)")
+      .select("order_id, orders!inner(id, user_id, order_number, total, payment_method, payment_status, order_status, customer_name, customer_phone, customer_email, coupon_code, shipping_address, items)")
       .eq("provider", "razorpay")
       .eq("provider_order_id", body.razorpayOrderId)
       .maybeSingle();
@@ -368,6 +370,10 @@ export const POST = safeRoute(async function POST(request: Request) {
       orderId: pendingOrder.id,
       error: err instanceof Error ? err.message : String(err)
     });
+  }
+
+  if (pendingOrder.customer_email) {
+    void autoSubscribeToNewsletter(pendingOrder.customer_email);
   }
 
   logInfo("verify.completed", {

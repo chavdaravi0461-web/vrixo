@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { useCartStore } from "@/lib/store/cart-store";
 import { useWishlistStore } from "@/lib/store/wishlist-store";
-import { cleanProductTitle } from "@/lib/utils";
+import { cleanProductTitle, formatCurrency } from "@/lib/utils";
 import { getFallbackProductImage, normalizeProductImage } from "@/lib/product-images";
 import type { Product } from "@/types/index";
 
@@ -138,7 +138,7 @@ export function StickyMobileBar({ product }: { product: Product }) {
         <div className="flex items-center gap-3">
           <div className="flex-1">
             <p className="text-sm font-semibold">{cleanProductTitle(product.title)}</p>
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>{product.price} — {inStock ? "In stock" : "Sold out"}</p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>{formatCurrency(product.price)} - {inStock ? "In stock" : "Sold out"}</p>
           </div>
           <button
             type="button"

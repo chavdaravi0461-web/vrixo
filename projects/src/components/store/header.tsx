@@ -128,19 +128,19 @@ export function Header() {
             Vrixo
           </Link>
 
-          <nav className="header-nav max-[1024px]:hidden">
-            <Link href="/home" className={cn("header-nav-item", pathname === "/home" && "!text-[var(--text)]")}>Home</Link>
+          <nav className="header-nav max-[1024px]:hidden" aria-label="Main navigation">
+            <Link href="/home" className={cn("header-nav-item", pathname === "/home" && "!text-[var(--text)]")} aria-current={pathname === "/home" ? "page" : undefined}>Home</Link>
             {menuItems.map((item) =>
               item.columns.length > 0 ? (
                 <div key={item.label} className="relative group">
-                  <span className="header-nav-item">{item.label}</span>
-                  <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                  <span className="header-nav-item" role="button" aria-expanded="false" aria-haspopup="true">{item.label}</span>
+                  <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200" role="menu">
                     <div className="glass-strong rounded-[var(--radius)] p-4 min-w-[200px]">
                       {item.columns.map((col) => (
                         <div key={col.title} className="mb-3 last:mb-0">
                           <p className="eyebrow mb-2 px-2">{col.title}</p>
                           {col.links.map((link) => (
-                            <Link key={link.label} href={link.href} className="block px-2 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors rounded-[4px] hover:bg-[var(--glass-hover)]">
+                            <Link key={link.label} href={link.href} className="block px-2 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors rounded-[4px] hover:bg-[var(--glass-hover)]" role="menuitem">
                               {link.label}
                             </Link>
                           ))}
@@ -150,7 +150,7 @@ export function Header() {
                   </div>
                 </div>
               ) : (
-                <Link key={item.label} href={item.href} className="header-nav-item">{item.label}</Link>
+                <Link key={item.label} href={item.href} className="header-nav-item" aria-current={pathname === item.href || pathname.startsWith(item.href + "?") ? "page" : undefined}>{item.label}</Link>
               )
             )}
           </nav>

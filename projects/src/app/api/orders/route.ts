@@ -16,6 +16,7 @@ import { calculateShippingCharge } from "@/lib/order-pricing";
 import { defaultShippingSettings, getShippingSettings } from "@/lib/shipping-settings";
 import { buildOrderSnapshotFromProducts } from "@/lib/server-order-utils";
 import { runPostOrderTasks } from "@/services/orders/post-order-tasks";
+import { autoSubscribeToNewsletter } from "@/lib/newsletter/auto-subscribe";
 import { sanitizeCustomerPhone } from "@/lib/whatsapp/phone";
 import { hasEmailEnv, sendEmail } from "@/lib/email";
 import { buildOrderConfirmationEmailHtml } from "@/lib/email-templates/order-confirmation";
@@ -225,6 +226,10 @@ export async function POST(request: Request) {
     }).catch((err) => {
       console.error("[checkout.cod] fireOrderConfirmationEmail_unhandled", JSON.stringify({ requestId, orderId: order.order_id, error: String(err?.message ?? err) }));
     });
+
+    if (customerEmail) {
+      void autoSubscribeToNewsletter(customerEmail);
+    }
 
     // Fire-and-forget: background tasks
     void runPostOrderTasks({

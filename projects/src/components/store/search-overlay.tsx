@@ -59,11 +59,11 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
 
   return (
     <>
-      <div className="fixed inset-0 z-[300]" style={{ background: "rgba(0,0,0,.6)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" }} onClick={onClose} />
-      <div className="fixed left-1/2 top-[15vh] -translate-x-1/2 z-[301] w-full max-w-[560px] px-4 anim-fade-down" style={{ animation: "fade-down .3s ease-out" }}>
+      <div className="fixed inset-0 z-[300]" style={{ background: "rgba(0,0,0,.6)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" }} onClick={onClose} aria-hidden="true" />
+      <div className="fixed left-1/2 top-[15vh] -translate-x-1/2 z-[301] w-full max-w-[560px] px-4 anim-fade-down" style={{ animation: "fade-down .3s ease-out" }} role="dialog" aria-modal="true" aria-label="Search products">
         <div className="glass-strong rounded-[var(--radius-lg)] overflow-hidden" style={{ boxShadow: "0 24px 80px rgba(0,0,0,.6)" }}>
           <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: "1px solid var(--glass-border)" }}>
-            <Search className="h-4 w-4 shrink-0" style={{ color: "var(--text-muted)" }} />
+            <Search className="h-4 w-4 shrink-0" style={{ color: "var(--text-muted)" }} aria-hidden="true" />
             <input
               ref={inputRef}
               value={query}
@@ -71,8 +71,13 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
               placeholder="Search products..."
               className="flex-1 bg-transparent text-sm outline-none" style={{ color: "var(--text)" }}
               autoComplete="off"
+              aria-label="Search products"
+              role="combobox"
+              aria-expanded={results.length > 0}
+              aria-activedescendant={results[selected] ? `search-result-${results[selected].id}` : undefined}
+              aria-controls="search-results-list"
             />
-            <button type="button" onClick={onClose} className="header-icon">
+            <button type="button" onClick={onClose} className="header-icon" aria-label="Close search">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -84,16 +89,19 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
           )}
 
           {!loading && results.length > 0 && (
-            <div className="max-h-[360px] overflow-y-auto py-2">
+            <div className="max-h-[360px] overflow-y-auto py-2" id="search-results-list" role="listbox" aria-label="Search results">
               {results.map((product, i) => {
                 const img = normalizeProductImage(product.images?.[0]);
                 return (
                   <Link
                     key={product.id}
+                    id={`search-result-${product.id}`}
                     href={`/product/${product.slug}`}
                     onClick={onClose}
                     className="flex items-center gap-3 px-5 py-2.5 transition-colors"
                     style={{ background: i === selected ? "var(--glass-hover)" : "transparent" }}
+                    role="option"
+                    aria-selected={i === selected}
                   >
                     <div className="w-10 h-10 rounded-[var(--radius-sm)] overflow-hidden shrink-0" style={{ background: "var(--bg-card)" }}>
                       {img && <Image src={img} alt="" width={40} height={40} className="object-cover w-full h-full" />}

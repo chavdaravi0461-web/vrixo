@@ -9,6 +9,7 @@ import { sanitizeRedirectPath } from "@/lib/safe-navigation";
 import { safeRoute } from "@/lib/safe-route";
 import { requireSameOrigin } from "@/lib/server/origin-check";
 import { tooManyRequests } from "@/lib/api-response";
+import { autoSubscribeToNewsletter } from "@/lib/newsletter/auto-subscribe";
 // @ts-expect-error — firebase/users.js has no type declarations
 import { createUser as createFirebaseUser } from "@/lib/firebase/users";
 
@@ -120,6 +121,8 @@ export const POST = safeRoute(async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+
+  void autoSubscribeToNewsletter(parsed.data.email);
 
   return response;
 });

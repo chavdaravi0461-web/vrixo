@@ -22,8 +22,8 @@ export function CartPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
   return (
     <>
-      <div className="cart-overlay" onClick={onClose} />
-      <div className="cart-panel" role="dialog" aria-modal="true" aria-label="Shopping cart">
+      <div className="cart-overlay" onClick={onClose} aria-hidden="true" />
+      <div className="cart-panel" role="dialog" aria-modal="true" aria-label="Shopping cart" aria-live="polite">
         <div className="cart-header">
           <span className="cart-title">Cart ({count})</span>
           <button type="button" className="cart-close" onClick={onClose} aria-label="Close cart">
@@ -47,9 +47,9 @@ export function CartPanel({ open, onClose }: { open: boolean; onClose: () => voi
 
         <div className="cart-items">
           {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center gap-4" style={{ padding: "40px 20px" }}>
+            <div className="flex flex-col items-center justify-center h-full text-center gap-4" style={{ padding: "40px 20px" }} role="status">
               <div style={{ width: "72px", height: "72px", borderRadius: "50%", background: "rgba(245,245,242,.05)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <ShoppingBag className="h-8 w-8 text-[var(--text-muted)]" />
+                <ShoppingBag className="h-8 w-8 text-[var(--text-muted)]" aria-hidden="true" />
               </div>
               <div>
                 <p style={{ fontSize: "15px", fontWeight: 500, color: "var(--text)", marginBottom: "4px" }}>Your cart is empty</p>
@@ -85,25 +85,27 @@ export function CartPanel({ open, onClose }: { open: boolean; onClose: () => voi
                       {[item.selectedSize, item.selectedColor].filter(Boolean).join(" / ")}
                     </div>
                   )}
-                  <div className="cart-item-qty">
+                  <div className="cart-item-qty" role="group" aria-label={`Quantity for ${item.title}`}>
                     <button
                       type="button"
                       className="cart-qty-btn"
+                      aria-label={item.quantity <= 1 ? "Remove item" : "Decrease quantity"}
                       onClick={() => {
                         if (item.quantity <= 1) removeItem(item.productId, item.selectedSize, item.selectedColor);
                         else updateQuantity(item.productId, item.quantity - 1, item.selectedSize, item.selectedColor);
                       }}
                     >
-                      <Minus className="h-3 w-3" />
+                      <Minus className="h-3 w-3" aria-hidden="true" />
                     </button>
-                    <span className="cart-qty-value">{item.quantity}</span>
+                    <span className="cart-qty-value" aria-label={`Quantity: ${item.quantity}`}>{item.quantity}</span>
                     <button
                       type="button"
                       className="cart-qty-btn"
                       disabled={item.stock ? item.quantity >= item.stock : false}
+                      aria-label="Increase quantity"
                       onClick={() => updateQuantity(item.productId, item.quantity + 1, item.selectedSize, item.selectedColor)}
                     >
-                      <Plus className="h-3 w-3" />
+                      <Plus className="h-3 w-3" aria-hidden="true" />
                     </button>
                   </div>
                 </div>

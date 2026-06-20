@@ -14,12 +14,12 @@ export function SectionHeading({
   return (
     <div className={cn("max-w-2xl space-y-3", className)}>
       {eyebrow ? (
-        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-teal-700">{eyebrow}</p>
+        <p className="eyebrow">{eyebrow}</p>
       ) : null}
-      <h2 className="font-serif text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+      <h2 className="section-title">
         {title}
       </h2>
-      {description ? <p className="text-base leading-7 text-slate-600">{description}</p> : null}
+      {description ? <p className="section-subtitle">{description}</p> : null}
     </div>
   );
 }

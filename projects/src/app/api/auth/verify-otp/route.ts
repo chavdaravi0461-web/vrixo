@@ -2,6 +2,7 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { autoSubscribeToNewsletter } from "@/lib/newsletter/auto-subscribe";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route";
 import { ensureOtpCustomerUser, findProfileByPhone } from "@/lib/phone-auth-server";
 import { normalizeIndianMobileNumber } from "@/lib/phone";
@@ -174,6 +175,10 @@ export const POST = safeRoute(async function POST(request: NextRequest) {
   }
 
   await adminSupabase.from("phone_otp_requests").delete().eq("phone", normalizedPhone);
+
+  if (existingProfile?.email) {
+    void autoSubscribeToNewsletter(existingProfile.email);
+  }
 
   return response;
 });

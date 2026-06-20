@@ -19,9 +19,9 @@ export function ProductGridPaginated({ products }: { products: Product[] }) {
           <button
             type="button"
             onClick={() => setPage((p) => p + 1)}
-            className="hero-btn hero-btn-ghost"
+            className="hero-btn hero-btn-ghost btn-glow"
           >
-             Show more ({products.length - shown.length})
+            Show more ({products.length - shown.length})
           </button>
         </div>
       )}

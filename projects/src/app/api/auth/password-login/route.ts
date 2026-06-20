@@ -6,6 +6,7 @@ import { hasServerSupabaseAdminEnv } from "@/lib/env/server";
 import { getIndianMobileLookupVariants, normalizeIndianMobileNumber } from "@/lib/phone";
 import { checkServerRateLimit } from "@/lib/rate-limit";
 import { tooManyRequests, forbidden } from "@/lib/api-response";
+import { autoSubscribeToNewsletter } from "@/lib/newsletter/auto-subscribe";
 import { sanitizeRedirectPath } from "@/lib/safe-navigation";
 import { safeRoute } from "@/lib/safe-route";
 import { requireSameOrigin } from "@/lib/server/origin-check";
@@ -56,6 +57,8 @@ export const POST = safeRoute(async function POST(request: NextRequest) {
       { status: 401 }
     );
   }
+
+  void autoSubscribeToNewsletter(email);
 
   return response;
 });

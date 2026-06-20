@@ -2,12 +2,12 @@ import { ProductGridSkeleton } from "@/components/store/product-grid-skeleton";
 
 export default function ShopLoading() {
   return (
-    <section className="bg-[var(--dc-surface)] pb-12 pt-4">
+    <section className="pb-12 pt-4" aria-busy="true" aria-label="Loading shop" role="status">
       <div className="container">
-        <div className="border border-[var(--dc-border)] bg-white p-5 shadow-sm md:p-7">
-          <div className="h-3 w-32 animate-pulse bg-[var(--dc-border)]" />
-          <div className="mt-4 h-10 w-72 max-w-full animate-pulse bg-[var(--dc-surface-strong)]" />
-          <div className="mt-3 h-4 w-full max-w-xl animate-pulse bg-[var(--dc-border)]" />
+        <div className="glass-card p-5 md:p-7">
+          <div className="skeleton h-3 w-32" />
+          <div className="skeleton mt-4 h-10 w-72 max-w-full" />
+          <div className="skeleton mt-3 h-4 w-full max-w-xl" />
         </div>
         <div className="mt-4">
           <ProductGridSkeleton />

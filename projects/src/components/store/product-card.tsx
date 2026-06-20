@@ -49,6 +49,8 @@ const ProductCardUnmemoized = ({ product, index = 0 }: { product: Product; index
       style={{ animationDelay: `${delay}s` }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      role="article"
+      aria-label={displayTitle}
     >
       <div className="p-card-image">
         <Link href={`/product/${product.slug}`}>
@@ -123,23 +125,23 @@ const ProductCardUnmemoized = ({ product, index = 0 }: { product: Product; index
         </div>
       )}
 
-      <div className="p-card-body">
+        <div className="p-card-body">
         <p className="p-card-category">{product.brand || product.category}</p>
         <Link href={`/product/${product.slug}`}>
           <h3 className="p-card-title">{displayTitle}</h3>
         </Link>
         {product.rating > 0 ? (
-          <div className="flex items-center gap-1" style={{ marginTop: "4px" }}>
-            <Star className="h-3.5 w-3.5 fill-[var(--accent)]" style={{ color: "var(--accent)" }} />
+          <div className="flex items-center gap-1" style={{ marginTop: "4px" }} aria-label={`Rating: ${product.rating.toFixed(1)} out of 5, ${product.reviewCount} reviews`}>
+            <Star className="h-3.5 w-3.5 fill-[var(--accent)]" style={{ color: "var(--accent)" }} aria-hidden="true" />
             <span className="body-sm" style={{ fontSize: "12px" }}>{product.rating.toFixed(1)}</span>
             <span className="body-sm" style={{ fontSize: "11px", color: "var(--text-muted)" }}>({product.reviewCount})</span>
           </div>
         ) : null}
-        <div className="p-card-price">
+        <div className="p-card-price" aria-label={`Price: ${formatCurrency(product.price)}`}>
           {formatCurrency(product.price)}
           {hasDiscount && <span className="p-card-price-original">{formatCurrency(product.originalPrice)}</span>}
         </div>
-        <button type="button" className="p-card-add" onClick={handleAdd} disabled={adding || !inStock}>
+        <button type="button" className="p-card-add" onClick={handleAdd} disabled={adding || !inStock} aria-label={inStock ? `Add ${displayTitle} to cart` : "Sold out"}>
           {adding ? "Adding..." : inStock ? "Add to cart" : "Sold out"}
         </button>
       </div>

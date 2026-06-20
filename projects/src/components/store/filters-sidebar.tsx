@@ -105,20 +105,25 @@ function CollapsibleFilter({ title, count, defaultOpen = false, children }: {
   title: string; count: number; defaultOpen?: boolean; children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const sectionId = `filter-section-${title.toLowerCase().replace(/\s+/g, "-")}`;
   return (
     <div style={{ borderBottom: "1px solid var(--border)" }}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", background: "none", border: "none", cursor: "pointer", color: "var(--text)" }}
-      >
-        <span style={{ fontSize: "13px", fontWeight: 500 }}>{title}</span>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{count}</span>
-          <ChevronDown size={14} style={{ color: "var(--text-muted)", transform: open ? "rotate(180deg)" : "rotate(0)", transition: "transform .3s ease" }} />
-        </div>
-      </button>
-      <div style={{ maxHeight: open ? "400px" : "0", overflow: "hidden", transition: "max-height .3s cubic-bezier(.33,1,.68,1)" }}>
+      <h3>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-controls={sectionId}
+          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", background: "none", border: "none", cursor: "pointer", color: "var(--text)" }}
+        >
+          <span style={{ fontSize: "13px", fontWeight: 500 }}>{title}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{count}</span>
+            <ChevronDown size={14} style={{ color: "var(--text-muted)", transform: open ? "rotate(180deg)" : "rotate(0)", transition: "transform .3s ease" }} aria-hidden="true" />
+          </div>
+        </button>
+      </h3>
+      <div id={sectionId} role="region" aria-labelledby={`filter-${title.toLowerCase().replace(/\s+/g, "-")}`} style={{ maxHeight: open ? "400px" : "0", overflow: "hidden", transition: "max-height .3s cubic-bezier(.33,1,.68,1)" }}>
         <div style={{ paddingBottom: "12px" }}>{children}</div>
       </div>
     </div>
