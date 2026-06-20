@@ -1,19 +1,30 @@
-import { Resend } from "resend";
-import { getOptionalServerEnv } from "@/lib/env/server";
+import nodemailer from "nodemailer";
 import { logInfo, logError } from "@/lib/observability";
 
-let resendClient: Resend | null = null;
+let transporter: nodemailer.Transporter | null = null;
 
-function getResendClient(): Resend | null {
-  if (resendClient) return resendClient;
-  const env = getOptionalServerEnv();
-  if (!env.RESEND_API_KEY) return null;
-  resendClient = new Resend(env.RESEND_API_KEY);
-  return resendClient;
+function getTransporter(): nodemailer.Transporter | null {
+  if (transporter) return transporter;
+
+  const host = process.env.BREVO_SMTP_HOST || "smtp-relay.brevo.com";
+  const port = Number(process.env.BREVO_SMTP_PORT || 587);
+  const user = process.env.BREVO_SMTP_LOGIN;
+  const pass = process.env.BREVO_SMTP_KEY;
+
+  if (!user || !pass) return null;
+
+  transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+
+  return transporter;
 }
 
 export function hasEmailEnv(): boolean {
-  return Boolean(getOptionalServerEnv().RESEND_API_KEY);
+  return Boolean(process.env.BREVO_SMTP_LOGIN && process.env.BREVO_SMTP_KEY);
 }
 
 type SendEmailParams = {
@@ -24,28 +35,26 @@ type SendEmailParams = {
 };
 
 export async function sendEmail({ to, subject, html, from }: SendEmailParams): Promise<{ sent: boolean; error: string | null }> {
-  const client = getResendClient();
-  const env = getOptionalServerEnv();
+  const transport = getTransporter();
 
-  if (!client) {
-    logError("email.send.skip", { reason: "no_resend_client" });
+  if (!transport) {
+    logError("email.send.skip", { reason: "no_smtp_transport" });
     return { sent: false, error: "Email service not configured." };
   }
 
   try {
-    const { data, error } = await client.emails.send({
-      from: from || env.RESEND_FROM_EMAIL || "Vrixo <notifications@vrixo.in>",
-      to: [to],
+    const senderEmail = process.env.BREVO_SENDER_EMAIL || "chavdaravi0461@gmail.com";
+    const senderName = process.env.BREVO_SENDER_NAME || "Vrixo";
+    const fromAddress = from || `${senderName} <${senderEmail}>`;
+
+    const info = await transport.sendMail({
+      from: fromAddress,
+      to,
       subject,
-      html
+      html,
     });
 
-    if (error) {
-      logError("email.send.failed", { to: to.slice(0, 3) + "***", error: error.message });
-      return { sent: false, error: error.message };
-    }
-
-    logInfo("email.send.success", { to: to.slice(0, 3) + "***", id: data?.id });
+    logInfo("email.send.success", { to: to.slice(0, 3) + "***", id: info.messageId });
     return { sent: true, error: null };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown email error";
