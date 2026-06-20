@@ -77,6 +77,7 @@ export const POST = safeRoute(async function POST(request: Request) {
 
   let sentCount = 0;
   let failedCount = 0;
+  const failedEmails: Array<{ email: string; reason: string }> = [];
 
   const batchSize = 10;
   for (let i = 0; i < uniqueEmails.length; i += batchSize) {
@@ -86,14 +87,28 @@ export const POST = safeRoute(async function POST(request: Request) {
         sendEmail({ to: email, subject, html: emailHtml })
       )
     );
-    for (const result of results) {
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j];
+      const emailAddr = batch[j];
       if (result.status === "fulfilled" && result.value.sent) {
         sentCount++;
       } else {
         failedCount++;
+        const reason = result.status === "fulfilled"
+          ? (result.value.error ?? "unknown")
+          : (result.reason instanceof Error ? result.reason.message : "promise_rejected");
+        failedEmails.push({ email: emailAddr, reason });
       }
     }
   }
+
+  console.log("[messaging.send] result", JSON.stringify({
+    subject,
+    totalRecipients: uniqueEmails.length,
+    sentCount,
+    failedCount,
+    failedEmails: failedEmails.slice(0, 10),
+  }));
 
   await supabase.from("customer_messages").insert({
     subject,
@@ -107,9 +122,10 @@ export const POST = safeRoute(async function POST(request: Request) {
   });
 
   return NextResponse.json({
-    message: `Message sent to ${sentCount} recipients${failedCount > 0 ? ` (${failedCount} failed)` : ""}.`,
+    message: `Message sent to ${sentCount} recipients${failedCount > 0 ? ` (${failedCount} failed — check Vercel logs for details)` : ""}.`,
     sentCount,
     failedCount,
+    failedEmails: failedEmails.slice(0, 10),
     totalRecipients: uniqueEmails.length,
   });
 });
