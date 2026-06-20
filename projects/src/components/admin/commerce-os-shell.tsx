@@ -17,6 +17,7 @@ import {
   Mail,
   Package,
   Search,
+  Send,
   Settings,
   Shield,
   Sparkles,
@@ -49,6 +50,7 @@ const navCommerce: NavItem[] = [
 ];
 
 const navOps: NavItem[] = [
+  { href: "/dashboard-admin-vrixo-ravi/messaging", label: "Messaging", icon: Send },
   { href: "/dashboard-admin-vrixo-ravi/notifications", label: "Signals", icon: Bell },
   { href: "/dashboard-admin-vrixo-ravi/tickets", label: "Support", icon: Mail },
   { href: "/dashboard-admin-vrixo-ravi/reviews", label: "Reviews", icon: Star },
