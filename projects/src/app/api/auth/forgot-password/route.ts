@@ -56,11 +56,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Email only — send reset link directly
+    // NOTE: Do NOT return userId or name — prevents account enumeration
     return NextResponse.json({
       message: "If an account exists with this email, you will receive a password reset link.",
       channels: [{ channel: "email" as const, label: "Email", detail: maskEmail(profile.email), recommended: true }],
-      userId: profile.id,
-      name: profile.name || "there"
     });
   } catch (err) {
     console.error("[forgot-password]", JSON.stringify({ message: "unhandled_error", error: err instanceof Error ? err.message : String(err) }));

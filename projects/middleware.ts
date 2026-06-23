@@ -6,8 +6,9 @@ import { getCanonicalHost } from "@/lib/canonical-host";
 const securityHeaders: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
-  "Permissions-Policy": 'camera=(), microphone=(), geolocation=(), payment=(self "https://checkout.razorpay.com")',
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(self), usb=(), magnetometer=(), gyroscope=(), accelerometer=()",
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
 };
 
@@ -54,7 +55,12 @@ export function middleware(request: NextRequest) {
 
   const response = NextResponse.next();
   applySecurityHeaders(response);
-  response.headers.set("X-Frame-Options", "SAMEORIGIN");
+
+  if (pathname.startsWith("/dashboard-admin-vrixo-ravi")) {
+    response.headers.set("X-Frame-Options", "DENY");
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
 
   return response;
 }

@@ -8,28 +8,28 @@ const scriptSrc = [
   "'unsafe-inline'",
   isDev ? "'unsafe-eval'" : "'wasm-unsafe-eval'",
   "https://checkout.razorpay.com",
+  "https://js.razorpay.com",
   isDev && "https://vercel.live",
 ].filter(Boolean).join(" ");
 
 const connectSrc = [
   "'self'",
-  "https:",
+  "https://rcttssjtujvntyvtclyh.supabase.co",
+  "https://api.razorpay.com",
+  "https://checkout.razorpay.com",
   "wss:",
-  "rcttssjtujvntyvtclyh.supabase.co",
-  "api.razorpay.com",
-  "checkout.razorpay.com",
   isDev && "https://vercel.live",
 ].filter(Boolean).join(" ");
 
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
-  "frame-ancestors 'self'",
+  "frame-ancestors 'none'",
   "object-src 'none'",
-  "form-action 'self' https://accounts.google.com https://accounts.youtube.com",
-  "img-src 'self' data: blob: https: *.supabase.co images.unsplash.com images.pexels.com https://lh3.googleusercontent.com *.googleusercontent.com",
+  "form-action 'self'",
+  "img-src 'self' data: blob: https://rcttssjtujvntyvtclyh.supabase.co https://images.unsplash.com https://images.pexels.com https://lh3.googleusercontent.com",
   "font-src 'self' data:",
-  `style-src 'self' 'unsafe-inline'`,
+  "style-src 'self' 'unsafe-inline'",
   `script-src ${scriptSrc}`,
   "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
   `connect-src ${connectSrc}`,
@@ -93,14 +93,15 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
           { key: "X-DNS-Prefetch-Control", value: "off" },
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
-          { key: "X-XSS-Protection", value: "1; mode=block" },
           { key: "Content-Security-Policy", value: contentSecurityPolicy },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=(), payment=(self \"https://checkout.razorpay.com\")"
+            value: "camera=(), microphone=(), geolocation=(), payment=(self), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
           }
         ]
       },

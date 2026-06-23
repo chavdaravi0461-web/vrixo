@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@supabase/supabase-js";
+import { checkServerRateLimit } from "@/lib/rate-limit";
 
 const sessionSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters."),
@@ -16,6 +17,11 @@ const tokenSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimit = await checkServerRateLimit(request, { key: "update-password", limit: 5, windowMs: 10 * 60 * 1000 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ message: "Too many attempts. Try again later." }, { status: 429 });
+    }
+
     const body = await request.json().catch(() => null);
 
     // Try session-based auth first (browser client sends access token)

@@ -4,8 +4,14 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/utils";
 import { validateCouponForCheckout } from "@/lib/game-coupons";
 import { safeRoute } from "@/lib/safe-route";
+import { checkServerRateLimit } from "@/lib/rate-limit";
 
 export const POST = safeRoute(async function POST(request: Request) {
+  const rateLimit = await checkServerRateLimit(request, { key: "coupon-validate", limit: 10, windowMs: 5 * 60 * 1000 });
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ message: "Too many attempts. Try again later." }, { status: 429 });
+  }
+
   const body = (await request.json().catch(() => null)) as {
     code?: string;
     subtotal?: number;

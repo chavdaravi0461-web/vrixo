@@ -5,6 +5,7 @@ import { useCartStore } from "@/lib/store/cart-store";
 import { formatCurrency } from "@/lib/utils";
 import { useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 const FREE_SHIPPING_THRESHOLD = 999;
 
@@ -63,7 +64,7 @@ export function CartPanel({ open, onClose }: { open: boolean; onClose: () => voi
             items.map((item) => (
               <div key={`${item.productId}-${item.selectedSize ?? "nosize"}-${item.selectedColor ?? "nocolor"}`} className="cart-item" style={{ animation: "fade-in .3s ease" }}>
                 <div className="cart-item-image">
-                  {item.image && <img src={item.image} alt={item.title} loading="lazy" />}
+                  {item.image && <Image src={item.image} alt={item.title} width={64} height={64} loading="lazy" style={{ borderRadius: "8px", objectFit: "cover" }} />}
                 </div>
                 <div className="cart-item-info">
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>

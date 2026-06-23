@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
@@ -192,7 +193,7 @@ export default function AccountPage() {
             textAlign: "center",
           }}>
             {user.avatar_url ? (
-              <img src={user.avatar_url} alt="" style={{ width: "72px", height: "72px", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border)", marginBottom: "14px" }} />
+               <Image src={user.avatar_url} alt="" width={72} height={72} style={{ borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border)", marginBottom: "14px" }} />
             ) : (
               <div style={{
                 width: "72px", height: "72px", borderRadius: "50%",
