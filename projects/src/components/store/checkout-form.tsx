@@ -50,7 +50,7 @@ export function CheckoutForm({
   const selectedPaymentMethod = useWatch({ control, name: "paymentMethod" });
   const [postalCode, setPostalCode] = useState("");
   const { ref: postalRef } = register("postalCode");
-  const { loading: pincodeLoading, error: pincodeError, result: pincodeResult } = usePincodeLookup(postalCode, { debounceMs: 350 });
+  const { loading: pincodeLoading, error: pincodeError, result: pincodeResult, apiAvailable } = usePincodeLookup(postalCode, { debounceMs: 350 });
 
   useEffect(() => {
     if (pincodeResult) {
@@ -59,11 +59,6 @@ export function CheckoutForm({
         setValue("state", pincodeResult.state || "");
         setValue("country", pincodeResult.country || "India");
       } catch {}
-    } else if (postalCode.length === 6 && !pincodeLoading) {
-      // when 6 digits entered but not found, clear fields
-      setValue("city", "");
-      setValue("state", "");
-      setValue("country", "");
     }
     if (pincodeError) {
       setError("postalCode", { message: typeof pincodeError === "string" ? pincodeError : "Invalid pincode." });
@@ -72,10 +67,14 @@ export function CheckoutForm({
 
   async function onCheckoutSubmit(values: CheckoutValues) {
     if (checkoutBusy || paymentBusy) return;
-    // Ensure valid pincode resolved before proceeding
-    if (!/^[0-9]{6}$/.test(values.postalCode || "") || !pincodeResult) {
-      setError("postalCode", { message: "Enter a valid 6-digit pincode and wait for lookup." });
-      toast.error("Please enter a valid pincode before continuing.");
+    if (!/^[0-9]{6}$/.test(values.postalCode || "")) {
+      setError("postalCode", { message: "Enter a valid 6-digit pincode." });
+      toast.error("Please enter a valid pincode.");
+      return;
+    }
+    if (!values.city?.trim() || !values.state?.trim()) {
+      setError("city", { message: "City is required." });
+      toast.error("Please enter your city and state.");
       return;
     }
     const isOnlinePayment = values.paymentMethod === "Online Payment";
@@ -214,6 +213,7 @@ export function CheckoutForm({
               />
               {pincodeLoading ? <span style={{ position: "absolute", right: 10, top: 10 }} className="body-sm">Loading...</span> : null}
               {!pincodeLoading && pincodeResult ? <span style={{ position: "absolute", right: 10, top: 10, color: "#16a34a", fontSize: "12px", fontWeight: 700 }}>OK</span> : null}
+              {!pincodeLoading && !pincodeResult && postalCode.length === 6 && !apiAvailable ? <span style={{ position: "absolute", right: 10, top: 10, color: "#f59e0b", fontSize: "10px", fontWeight: 600 }}>Fill city & state manually</span> : null}
             </div>
           </Field>
           <Field label="Address line 1" error={errors.line1?.message} className="md:col-span-2"><Input {...register("line1")} /></Field>

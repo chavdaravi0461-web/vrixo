@@ -4,7 +4,7 @@ export type PincodeLookupResult = {
   district?: string;
   state: string;
   country: string;
-  source: "api" | "cache";
+  source: "api" | "cache" | "fallback";
 };
 
 const CACHE_PREFIX = "vrixo:pincode:";
@@ -42,9 +42,16 @@ function writeCache(pin: string, data: PincodeLookupResult) {
 
 export async function fetchPincodeFromApi(pin: string): Promise<PincodeLookupResult | null> {
   try {
-    const res = await fetch(`https://api.postalpincode.in/pincode/${encodeURIComponent(pin)}`, { cache: "no-store" });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+
+    const res = await fetch(`https://api.postalpincode.in/pincode/${encodeURIComponent(pin)}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
     const json = await res.json();
-    // API returns an array with a status and PostOffice array
     if (!Array.isArray(json) || json.length === 0) return null;
     const entry = json[0];
     if (!entry || entry.Status !== "Success" || !Array.isArray(entry.PostOffice) || entry.PostOffice.length === 0) return null;
@@ -62,6 +69,16 @@ export async function fetchPincodeFromApi(pin: string): Promise<PincodeLookupRes
   } catch {
     return null;
   }
+}
+
+export function getFallbackPincode(pin: string): PincodeLookupResult {
+  return {
+    pincode: pin,
+    city: "",
+    state: "",
+    country: "India",
+    source: "fallback",
+  };
 }
 
 export async function lookupPincode(pin: string): Promise<PincodeLookupResult | null> {
